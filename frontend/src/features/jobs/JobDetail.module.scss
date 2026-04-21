@@ -1,0 +1,59 @@
+.jobDetail {
+  h1 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 600;
+  }
+
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .company {
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #f0f0f0;
+
+    h2 {
+      margin: 0 0 8px 0;
+      font-size: 18px;
+      color: #666;
+    }
+
+    .info {
+      display: flex;
+      gap: 8px;
+      color: #999;
+      font-size: 14px;
+
+      span:nth-child(even) {
+        color: #d9d9d9;
+      }
+    }
+  }
+
+  .content {
+    margin-bottom: 24px;
+
+    h3 {
+      margin: 0 0 12px 0;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    div {
+      line-height: 1.8;
+      color: #666;
+    }
+  }
+
+  .tags {
+    h3 {
+      margin: 0 0 12px 0;
+      font-size: 16px;
+      font-weight: 600;
+    }
+  }
+}

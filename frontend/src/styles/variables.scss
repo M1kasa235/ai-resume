@@ -1,0 +1,195 @@
+// SCSS Variables
+$primary-color: #1890ff;
+$success-color: #52c41a;
+$warning-color: #faad14;
+$error-color: #f5222d;
+$text-color: #333;
+$text-color-secondary: #666;
+$border-color: #d9d9d9;
+$background-color: #f5f5f5;
+$card-background: #fff;
+$shadow-color: rgba(0, 0, 0, 0.1);
+
+// Breakpoints
+$breakpoints: (
+  xs: 480px,
+  sm: 576px,
+  md: 768px,
+  lg: 992px,
+  xl: 1200px,
+  xxl: 1600px
+);
+
+// Spacing
+$spacing: (
+  xs: 4px,
+  sm: 8px,
+  md: 16px,
+  lg: 24px,
+  xl: 32px,
+  xxl: 48px
+);
+
+// Font sizes
+$font-sizes: (
+  xs: 12px,
+  sm: 14px,
+  md: 16px,
+  lg: 18px,
+  xl: 20px,
+  xxl: 24px,
+  xxxl: 28px
+);
+
+// Border radius
+$border-radius: (
+  sm: 4px,
+  md: 6px,
+  lg: 8px,
+  xl: 12px
+);
+
+// Z-index
+$z-index: (
+  dropdown: 1000,
+  sticky: 1020,
+  fixed: 1030,
+  modal-backdrop: 1040,
+  modal: 1050,
+  popover: 1060,
+  tooltip: 1070
+);
+
+// Transitions
+$transition-base: all 0.3s ease;
+$transition-fast: all 0.2s ease;
+$transition-slow: all 0.5s ease;
+
+// Shadows
+$shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+$shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+$shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+$shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+$shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
+// Mixins
+@mixin flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@mixin flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+@mixin flex-column {
+  display: flex;
+  flex-direction: column;
+}
+
+@mixin text-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@mixin multi-line-ellipsis($lines: 2) {
+  display: -webkit-box;
+  -webkit-line-clamp: $lines;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+@mixin responsive($breakpoint) {
+  @if map-has-key($breakpoints, $breakpoint) {
+    @media (max-width: map-get($breakpoints, $breakpoint)) {
+      @content;
+    }
+  }
+}
+
+@mixin hover-effect {
+  transition: $transition-base;
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: $shadow-md;
+  }
+}
+
+@mixin card-shadow {
+  box-shadow: $shadow;
+  border-radius: map-get($border-radius, lg);
+  background: $card-background;
+}
+
+@mixin gradient-bg($start-color, $end-color) {
+  background: linear-gradient(135deg, $start-color 0%, $end-color 100%);
+}
+
+// Utility classes
+.text-primary { color: $primary-color; }
+.text-success { color: $success-color; }
+.text-warning { color: $warning-color; }
+.text-error { color: $error-color; }
+.text-secondary { color: $text-color-secondary; }
+
+.bg-primary { background-color: $primary-color; }
+.bg-success { background-color: $success-color; }
+.bg-warning { background-color: $warning-color; }
+.bg-error { background-color: $error-color; }
+.bg-secondary { background-color: $background-color; }
+
+.shadow-sm { box-shadow: $shadow-sm; }
+.shadow { box-shadow: $shadow; }
+.shadow-md { box-shadow: $shadow-md; }
+.shadow-lg { box-shadow: $shadow-lg; }
+.shadow-xl { box-shadow: $shadow-xl; }
+
+.rounded-sm { border-radius: map-get($border-radius, sm); }
+.rounded { border-radius: map-get($border-radius, md); }
+.rounded-lg { border-radius: map-get($border-radius, lg); }
+.rounded-xl { border-radius: map-get($border-radius, xl); }
+
+.border-sm { border-width: 1px; }
+.border { border-width: 1px; }
+.border-lg { border-width: 2px; }
+
+.p-xs { padding: map-get($spacing, xs); }
+.p-sm { padding: map-get($spacing, sm); }
+.p-md { padding: map-get($spacing, md); }
+.p-lg { padding: map-get($spacing, lg); }
+.p-xl { padding: map-get($spacing, xl); }
+.p-xxl { padding: map-get($spacing, xxl); }
+
+.m-xs { margin: map-get($spacing, xs); }
+.m-sm { margin: map-get($spacing, sm); }
+.m-md { margin: map-get($spacing, md); }
+.m-lg { margin: map-get($spacing, lg); }
+.m-xl { margin: map-get($spacing, xl); }
+.m-xxl { margin: map-get($spacing, xxl); }
+
+// Animation keyframes
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideIn {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+// Animation classes
+.fade-in { animation: fadeIn 0.3s ease-in-out; }
+.slide-in { animation: slideIn 0.3s ease-out; }
+.pulse { animation: pulse 2s infinite; }

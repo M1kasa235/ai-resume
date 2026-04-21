@@ -1,0 +1,101 @@
+.jobs {
+  h1 {
+    margin-bottom: 24px;
+    font-size: 32px;
+    font-weight: 600;
+  }
+}
+
+.searchCard {
+  margin-bottom: 24px;
+}
+
+.jobCard {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+
+  .ant-card-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+.jobHeader {
+  margin-bottom: 16px;
+
+  h3 {
+    margin: 0 0 8px 0;
+    font-size: 18px;
+    font-weight: 600;
+  }
+
+  .company {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #666;
+    font-size: 14px;
+  }
+}
+
+.jobInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  .location {
+    color: #666;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .jobStats {
+    display: flex;
+    gap: 16px;
+    color: #999;
+    font-size: 12px;
+  }
+}
+
+.hotJob {
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f0f0;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  h4 {
+    margin: 0 0 4px 0;
+    font-size: 16px;
+    font-weight: 500;
+  }
+
+  p {
+    margin: 0 0 8px 0;
+    color: #666;
+    font-size: 14px;
+  }
+
+  .hotJobInfo {
+    display: flex;
+    justify-content: space-between;
+    color: #999;
+    font-size: 12px;
+  }
+}
+
+.loading {
+  padding: 48px 0;
+}

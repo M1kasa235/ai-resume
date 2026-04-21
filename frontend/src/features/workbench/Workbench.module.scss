@@ -1,0 +1,105 @@
+.workbench {
+  h1 {
+    margin-bottom: 24px;
+    font-size: 32px;
+    font-weight: 600;
+  }
+}
+
+.resumeCard {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 24px;
+  background: #f8f9fa;
+  border-radius: 8px;
+
+  .resumeInfo {
+    flex: 1;
+
+    h3 {
+      margin: 0 0 8px 0;
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    p {
+      margin: 0 0 16px 0;
+      color: #666;
+    }
+  }
+}
+
+.statCard {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+
+  .statIcon {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #e6f7ff;
+    border-radius: 50%;
+    color: #1890ff;
+    font-size: 24px;
+  }
+
+  .statContent {
+    flex: 1;
+
+    .statNumber {
+      font-size: 24px;
+      font-weight: 600;
+      color: #1890ff;
+      margin-bottom: 4px;
+    }
+
+    .statLabel {
+      color: #666;
+      font-size: 14px;
+    }
+  }
+}
+
+.applicationDetail {
+  h2 {
+    margin: 0 0 16px 0;
+    font-size: 20px;
+    font-weight: 600;
+  }
+
+  p {
+    margin: 0 0 24px 0;
+    color: #666;
+  }
+
+  .detailInfo {
+    margin-top: 24px;
+  }
+}
+
+.detailItem {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+
+  span:first-child {
+    font-weight: 500;
+    color: #333;
+  }
+
+  span:last-child {
+    color: #666;
+  }
+}
+
+.loading {
+  padding: 48px 0;
+  text-align: center;
+}

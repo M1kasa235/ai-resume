@@ -1,0 +1,25 @@
+.login {
+  h2 {
+    text-align: center;
+    margin-bottom: 32px;
+    font-size: 28px;
+    font-weight: 600;
+  }
+}
+
+.options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.footer {
+  text-align: center;
+  margin-top: 16px;
+  color: #666;
+
+  a {
+    color: #1890ff;
+    margin-left: 4px;
+  }
+}

@@ -110,6 +110,6 @@ class WorkbenchService:
         return ApplicationListResponse(
             total=total,
             page=page,
-            size=size,
+            page_size=size,
             items=items
         )

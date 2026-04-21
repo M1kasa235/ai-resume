@@ -30,7 +30,7 @@ class ApplicationListResponse(BaseModel):
     """投递记录列表响应模型"""
     total: int
     page: int
-    size: int
+    page_size: int
     items: List[ApplicationItem]
 
 
@@ -38,3 +38,24 @@ class UploadResumeResponse(BaseModel):
     """上传简历响应模型"""
     url: str
     message: str
+
+
+class ApplicationCreate(BaseModel):
+    """创建投递记录请求模型"""
+    job_id: int
+    notes: Optional[str] = None
+
+
+class ApplicationResponse(BaseModel):
+    """投递记录响应模型"""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    user_id: int
+    job_id: Optional[int] = None
+    company_name: str
+    job_title: str
+    status: str
+    applied_at: Optional[datetime] = None
+    notes: Optional[str] = None
+    created_at: datetime

@@ -1,0 +1,135 @@
+.questions {
+  h1 {
+    margin-bottom: 24px;
+    font-size: 32px;
+    font-weight: 600;
+  }
+}
+
+.searchCard {
+  margin-bottom: 24px;
+}
+
+.tabs {
+  .ant-tabs-nav {
+    margin-bottom: 24px;
+  }
+}
+
+.questionCard {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+
+  .ant-card-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+.questionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+
+  .questionTitle {
+    font-size: 18px;
+    font-weight: 600;
+    flex: 1;
+    margin-right: 16px;
+  }
+
+  .questionMeta {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+}
+
+.questionContent {
+  margin-bottom: 16px;
+  color: #666;
+  line-height: 1.6;
+}
+
+.questionTags {
+  margin-bottom: 16px;
+}
+
+.questionStats {
+  display: flex;
+  gap: 16px;
+  color: #999;
+  font-size: 12px;
+  margin-top: auto;
+}
+
+.wrongQuestionCard {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+
+  .ant-card-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+.wrongQuestionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+
+  h4 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+  }
+}
+
+.wrongQuestionStats {
+  margin-bottom: 16px;
+  color: #666;
+  font-size: 14px;
+}
+
+.favoriteQuestionCard {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+
+  .ant-card-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+.favoriteQuestionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+
+  h4 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+  }
+}
+
+.favoriteQuestionMeta {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  color: #666;
+  font-size: 14px;
+}
+
+.loading {
+  padding: 48px 0;
+}

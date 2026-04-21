@@ -1,12 +1,14 @@
 # app/api/v1/workbench.py
-from fastapi import APIRouter, Depends, UploadFile, File, Query
+from fastapi import APIRouter, Depends, UploadFile, File, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
+from datetime import datetime
 
 from app.api.deps import get_current_user, get_db
 from app.models.user import User
+from app.models.job import Job
 from app.services.workbench_service import WorkbenchService
-from app.schemas.workbench import ResumeInfo, ApplicationListResponse, UploadResumeResponse
+from app.schemas.workbench import ResumeInfo, ApplicationListResponse, UploadResumeResponse, ApplicationCreate, ApplicationResponse
 
 router = APIRouter(prefix="/workbench", tags=["工作台"])
 
@@ -42,3 +44,47 @@ async def get_applications(
     """分页获取个人的投递记录"""
     service = WorkbenchService(db)
     return await service.get_applications(current_user.id, page, size)
+
+
+@router.post("/applications", response_model=ApplicationResponse, status_code=201)
+async def apply_job(
+    application_data: ApplicationCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """投递简历到指定岗位"""
+    from app.models.application import Application
+    
+    # 检查岗位是否存在
+    job = await db.get(Job, application_data.job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="岗位不存在")
+    
+    # 检查是否已经投递过
+    from sqlalchemy import select
+    stmt = select(Application).where(
+        Application.user_id == current_user.id,
+        Application.job_id == application_data.job_id
+    )
+    result = await db.execute(stmt)
+    existing_application = result.scalar_one_or_none()
+    
+    if existing_application:
+        raise HTTPException(status_code=400, detail="您已经投递过该岗位")
+    
+    # 创建投递记录
+    new_application = Application(
+        user_id=current_user.id,
+        job_id=application_data.job_id,
+        company_name=job.company_name,
+        job_title=job.title,
+        status='applied',
+        applied_at=datetime.utcnow(),
+        notes=application_data.notes
+    )
+    
+    db.add(new_application)
+    await db.commit()
+    await db.refresh(new_application)
+    
+    return new_application

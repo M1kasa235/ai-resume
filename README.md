@@ -13,8 +13,8 @@ AI 求职助手后端 API，基于 FastAPI + SQLAlchemy 构建，提供岗位管
 
 1. **克隆项目**
 ```bash
-git clone https://github.com/your-username/ai-job-assistant.git
-cd ai-job-assistant
+git clone https://github.com/M1kasa235/ai-resume.git
+cd ai-resume
 ```
 
 2. **创建虚拟环境**
@@ -32,9 +32,11 @@ pip install -r requirements.txt
 4. **配置环境变量**
 ```bash
 # 复制示例配置文件
-cp .env.example .env
+cp .env.example .env  # Linux/Mac
+# 或 copy .env.example .env  # Windows
 
 # 编辑 .env 文件，修改数据库配置和 SECRET_KEY
+# ⚠️ 重要：不要将 .env 文件提交到 Git！
 ```
 
 5. **创建数据库**

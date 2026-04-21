@@ -65,6 +65,7 @@ class UserResponse(UserBase):
     work_years: Optional[int] = None
     education: Optional[str] = None
     is_active: bool
+    is_admin: bool
     created_at: datetime
     last_login_at: Optional[datetime] = None
 
