@@ -12,6 +12,7 @@ const Jobs = lazy(() => import('@features/jobs'));
 const JobDetail = lazy(() => import('@features/jobs/Detail'));
 const Questions = lazy(() => import('@features/questions'));
 const Workbench = lazy(() => import('@features/workbench'));
+const AIInterview = lazy(() => import('@features/aiInterview'));
 const Profile = lazy(() => import('@features/profile'));
 const Settings = lazy(() => import('@features/settings'));
 
@@ -73,6 +74,11 @@ export const routes: AppRoute[] = [
         path: 'workbench',
         element: <Workbench />,
         meta: { title: '工作台', icon: 'ToolOutlined', breadcrumb: '工作台' },
+      },
+      {
+        path: 'ai-interview',
+        element: <AIInterview />,
+        meta: { title: 'AI面试', icon: 'RobotOutlined', breadcrumb: 'AI面试' },
       },
       {
         path: 'profile',

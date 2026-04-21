@@ -4,6 +4,7 @@ import {
   DashboardOutlined,
   SearchOutlined,
   QuestionCircleOutlined,
+  RobotOutlined,
   ToolOutlined,
   UserOutlined,
   SettingOutlined,
@@ -35,6 +36,11 @@ const menuItems = [
     key: '/questions',
     icon: <QuestionCircleOutlined />,
     label: '题库练习',
+  },
+  {
+    key: '/ai-interview',
+    icon: <RobotOutlined />,
+    label: 'AI面试',
   },
   {
     key: '/workbench',

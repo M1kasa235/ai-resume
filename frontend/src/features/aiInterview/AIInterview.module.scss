@@ -1,0 +1,48 @@
+.aiInterview {
+  h1 {
+    margin-bottom: 24px;
+    font-size: 24px;
+    font-weight: 600;
+  }
+}
+
+.setupCard {
+  margin-bottom: 16px;
+}
+
+.chatCard {
+  :global(.ant-list-items) {
+    max-height: 420px;
+    overflow-y: auto;
+  }
+}
+
+.userItem {
+  justify-content: flex-end;
+}
+
+.assistantItem {
+  justify-content: flex-start;
+}
+
+.bubble {
+  max-width: 80%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f5f7fa;
+}
+
+.userItem .bubble {
+  background: #e6f4ff;
+}
+
+.role {
+  margin-bottom: 6px;
+  color: #8c8c8c;
+  font-size: 12px;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+}

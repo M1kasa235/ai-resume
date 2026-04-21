@@ -28,6 +28,93 @@
   }
 }
 
+.growthPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.summaryRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.legendRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legendDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.dotApplications {
+  background: #1677ff;
+}
+
+.dotPractices {
+  background: #722ed1;
+}
+
+.dotInterviews {
+  background: #52c41a;
+}
+
+.chartArea {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 160px;
+  padding: 12px 8px;
+  border-radius: 8px;
+  background: #fafafa;
+}
+
+.chartGroup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 36px;
+}
+
+.barApplications,
+.barPractices,
+.barInterviews {
+  width: 10px;
+  border-radius: 6px;
+}
+
+.barApplications {
+  background: #1677ff;
+}
+
+.barPractices {
+  background: #722ed1;
+}
+
+.barInterviews {
+  background: #52c41a;
+}
+
+.chartLabel {
+  color: #999;
+  font-size: 12px;
+}
+
 .progress {
   .progressItem {
     margin-bottom: 24px;

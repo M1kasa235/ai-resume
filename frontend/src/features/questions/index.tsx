@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 import { questionApi } from '@services/api';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Card,
   Row,
@@ -12,6 +12,11 @@ import {
   Tag,
   Empty,
   Tabs,
+  Modal,
+  Radio,
+  Space,
+  Typography,
+  message,
 } from 'antd';
 
 import type { Question, PaginatedResponse } from '@/types';
@@ -24,6 +29,7 @@ const { Option } = Select;
 const { TabPane } = Tabs;
 
 export default function Questions() {
+  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useState({
     keyword: '',
     difficulty: '' as 'easy' | 'medium' | 'hard' | '',
@@ -32,6 +38,15 @@ export default function Questions() {
     page: 1,
     page_size: 20,
   });
+  const [practiceVisible, setPracticeVisible] = useState(false);
+  const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
+  const [answer, setAnswer] = useState('');
+  const [practiceStartAt, setPracticeStartAt] = useState<number | null>(null);
+  const [submitResult, setSubmitResult] = useState<{
+    is_correct: boolean;
+    correct_answer?: string;
+    explanation?: string;
+  } | null>(null);
 
   const { data: questionsData, isLoading } = useQuery({
     queryKey: ['questions', searchParams],
@@ -67,6 +82,67 @@ export default function Questions() {
 
   const handleSearch = (values: Record<string, string>) => {
     setSearchParams(prev => ({ ...prev, ...values, page: 1 }));
+  };
+
+  const submitAnswerMutation = useMutation({
+    mutationFn: (payload: { questionId: number; answerText: string; timeSpent?: number }) =>
+      questionApi.submitAnswer(payload.questionId, {
+        answer: payload.answerText,
+        time_spent: payload.timeSpent,
+      }),
+    onSuccess: (data) => {
+      const result = data as unknown as {
+        is_correct: boolean;
+        correct_answer?: string;
+        explanation?: string;
+      };
+      setSubmitResult(result);
+      queryClient.invalidateQueries({ queryKey: ['wrong-questions'] });
+      queryClient.invalidateQueries({ queryKey: ['questions'] });
+      message.success(result.is_correct ? '回答正确' : '回答已提交');
+    },
+    onError: () => {
+      message.error('提交答案失败，请稍后重试');
+    },
+  });
+
+  const startPractice = async (questionId: number) => {
+    try {
+      const detail = await questionApi.getQuestionDetail(questionId);
+      setCurrentQuestion(detail as unknown as Question);
+      setAnswer('');
+      setSubmitResult(null);
+      setPracticeStartAt(Date.now());
+      setPracticeVisible(true);
+    } catch {
+      message.error('获取题目详情失败，请稍后重试');
+    }
+  };
+
+  const closePractice = () => {
+    setPracticeVisible(false);
+    setCurrentQuestion(null);
+    setAnswer('');
+    setSubmitResult(null);
+    setPracticeStartAt(null);
+  };
+
+  const handleSubmitAnswer = () => {
+    if (!currentQuestion) return;
+    const trimmed = answer.trim();
+    if (!trimmed) {
+      message.warning('请先输入答案');
+      return;
+    }
+
+    const elapsedSeconds =
+      practiceStartAt && practiceStartAt > 0 ? Math.floor((Date.now() - practiceStartAt) / 1000) : undefined;
+
+    submitAnswerMutation.mutate({
+      questionId: currentQuestion.id,
+      answerText: trimmed,
+      timeSpent: elapsedSeconds,
+    });
   };
 
   const renderDifficulty = (difficulty?: string) => {
@@ -113,7 +189,7 @@ export default function Questions() {
         </div>
       }
       extra={
-        <Button type="primary" onClick={() => { /* TODO: 实现练习功能 */ }}>
+        <Button type="primary" onClick={() => startPractice(question.id)}>
           开始练习
         </Button>
       }
@@ -212,7 +288,7 @@ export default function Questions() {
                       <span>错误次数: {item.wrong_count}</span>
                       <span>最后错误: {new Date(item.last_wrong_at).toLocaleDateString()}</span>
                     </div>
-                    <Button type="primary" block>
+                    <Button type="primary" block onClick={() => startPractice(item.question_id)}>
                       重新练习
                     </Button>
                   </Card>
@@ -238,7 +314,7 @@ export default function Questions() {
                       <span>{item.difficulty}</span>
                       <span>{item.type}</span>
                     </div>
-                    <Button type="primary" block>
+                    <Button type="primary" block onClick={() => startPractice(item.question_id)}>
                       开始练习
                     </Button>
                   </Card>
@@ -250,6 +326,79 @@ export default function Questions() {
           )}
         </TabPane>
       </Tabs>
+
+      <Modal
+        title={currentQuestion ? `题目练习：${currentQuestion.title}` : '题目练习'}
+        open={practiceVisible}
+        onCancel={closePractice}
+        width={760}
+        footer={
+          <Space>
+            <Button onClick={closePractice}>关闭</Button>
+            <Button
+              type="primary"
+              onClick={handleSubmitAnswer}
+              loading={submitAnswerMutation.isPending}
+              disabled={!currentQuestion}
+            >
+              提交答案
+            </Button>
+          </Space>
+        }
+      >
+        {currentQuestion ? (
+          <div className={styles.practicePanel}>
+            <div className={styles.practiceMeta}>
+              {renderDifficulty(currentQuestion.difficulty)}
+              <Tag>{renderType(currentQuestion.type)}</Tag>
+            </div>
+            {currentQuestion.content && <Typography.Paragraph>{currentQuestion.content}</Typography.Paragraph>}
+
+            {currentQuestion.options?.length ? (
+              <Radio.Group
+                className={styles.optionGroup}
+                value={answer}
+                onChange={(e) => setAnswer(e.target.value)}
+              >
+                <Space direction="vertical" style={{ width: '100%' }}>
+                  {currentQuestion.options.map((option, index) => (
+                    <Radio key={index} value={String(option)}>
+                      {option}
+                    </Radio>
+                  ))}
+                </Space>
+              </Radio.Group>
+            ) : (
+              <Input.TextArea
+                rows={6}
+                value={answer}
+                onChange={(e) => setAnswer(e.target.value)}
+                placeholder="请输入你的答案..."
+              />
+            )}
+
+            {submitResult && (
+              <div className={styles.resultPanel}>
+                <Tag color={submitResult.is_correct ? 'success' : 'error'}>
+                  {submitResult.is_correct ? '回答正确' : '回答错误'}
+                </Tag>
+                {submitResult.correct_answer && (
+                  <Typography.Paragraph>
+                    <strong>正确答案：</strong>
+                    {submitResult.correct_answer}
+                  </Typography.Paragraph>
+                )}
+                {submitResult.explanation && (
+                  <Typography.Paragraph>
+                    <strong>解析：</strong>
+                    {submitResult.explanation}
+                  </Typography.Paragraph>
+                )}
+              </div>
+            )}
+          </div>
+        ) : null}
+      </Modal>
     </div>
   );
 }

@@ -2,7 +2,7 @@ import { useUserStore } from '@stores/userStore';
 import { message } from 'antd';
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 export interface ApiResponse<T = unknown> {
   error_code?: string;
@@ -107,7 +107,7 @@ instance.interceptors.response.use(
       }
 
       try {
-        const response = await instance.post('/auth/refresh', {
+        const response = await instance.post('/api/v1/auth/refresh', {
           refresh_token: refreshToken,
         });
 

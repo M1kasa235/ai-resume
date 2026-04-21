@@ -88,6 +88,14 @@ export default function Jobs() {
     queryFn: () => jobApi.getHotJobs(8),
   });
 
+  const hotJobsList: Job[] = Array.isArray(hotJobs)
+    ? (hotJobs as Job[])
+    : Array.isArray((hotJobs as any)?.data)
+      ? ((hotJobs as any).data as Job[])
+      : Array.isArray((hotJobs as any)?.data?.data)
+        ? ((hotJobs as any).data.data as Job[])
+        : [];
+
   const toggleFavorite = async (jobId: number) => {
     const newFavorites = new Set(favorites);
     if (newFavorites.has(jobId)) {
@@ -290,8 +298,8 @@ export default function Jobs() {
 
         <Col xs={24} lg={6}>
           <Card title="热门岗位">
-            {hotJobs?.data?.data && Array.isArray(hotJobs.data.data) ? (
-              hotJobs.data.data.map((job: Job) => (
+            {hotJobsList.length > 0 ? (
+              hotJobsList.map((job: Job) => (
                 <div 
                   key={job.id} 
                   className={styles.hotJob}
@@ -302,7 +310,7 @@ export default function Jobs() {
                   <p>{job.company_name}</p>
                   <div className={styles.hotJobInfo}>
                     <span>{job.city}</span>
-                    <span>{renderSalary(job.salary_min, job.salary_max)}</span>
+                    <span>{job.salary_display || renderSalary(job.salary_min, job.salary_max)}</span>
                   </div>
                 </div>
               ))

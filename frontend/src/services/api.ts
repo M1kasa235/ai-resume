@@ -1,4 +1,20 @@
-import type { ApiResponse, PaginatedResponse, Token, User, DashboardOverviewResponse, GrowthCurveResponse, ActivitiesResponse, Job, Question, WrongQuestionItem, FavoriteQuestionItem } from '@/types/api';
+import type {
+  ApiResponse,
+  PaginatedResponse,
+  Token,
+  User,
+  DashboardOverviewResponse,
+  GrowthCurveResponse,
+  ActivitiesResponse,
+  Job,
+  Question,
+  WrongQuestionItem,
+  FavoriteQuestionItem,
+  AIInterviewSession,
+  AIInterviewStartRequest,
+  AIInterviewReplyRequest,
+  AIInterviewReplyResponse,
+} from '@/types/api';
 
 import http from './http';
 
@@ -42,7 +58,7 @@ export const authApi = {
 export const userApi = {
   // 获取个人资料
   getProfile: async () => {
-    return http.get<ApiResponse>('/api/v1/users/profile');
+    return http.get<ApiResponse<User>>('/api/v1/users/profile');
   },
 
   // 更新个人资料
@@ -55,7 +71,7 @@ export const userApi = {
     education?: string;
     avatar_url?: string;
   }) => {
-    return http.put<ApiResponse>('/api/v1/users/profile', data);
+    return http.put<ApiResponse<User>>('/api/v1/users/profile', data);
   },
 
   // 修改密码
@@ -331,5 +347,28 @@ export const dashboardApi = {
   // 获取个人最新动态
   getActivities: async (limit: number = 10) => {
     return http.get<ApiResponse<ActivitiesResponse>>('/api/v1/dashboard/activities', { params: { limit } });
+  },
+};
+
+// ==================== AI面试接口 ====================
+export const aiInterviewApi = {
+  // 创建一次新的AI面试会话
+  startSession: async (data: AIInterviewStartRequest) => {
+    return http.post<ApiResponse<AIInterviewSession>>('/api/v1/ai-interview/sessions', data);
+  },
+
+  // 发送消息并获取AI回复
+  sendMessage: async (data: AIInterviewReplyRequest) => {
+    return http.post<ApiResponse<AIInterviewReplyResponse>>('/api/v1/ai-interview/messages', data);
+  },
+
+  // 获取会话详情（用于恢复历史）
+  getSession: async (sessionId: string) => {
+    return http.get<ApiResponse<AIInterviewSession>>(`/api/v1/ai-interview/sessions/${sessionId}`);
+  },
+
+  // 结束会话
+  endSession: async (sessionId: string) => {
+    return http.post<ApiResponse>(`/api/v1/ai-interview/sessions/${sessionId}/end`);
   },
 };

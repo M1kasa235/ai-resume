@@ -5,7 +5,7 @@ from fastapi.security import HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db, get_current_user
-from app.schemas.token import Token
+from app.schemas.token import RefreshTokenRequest, Token
 from app.schemas.user import UserCreate, UserLogin, UserResponse
 from app.services.user_service import UserService
 from app.core.security import create_access_token, create_refresh_token, decode_token
@@ -66,18 +66,21 @@ async def login(
 
 
 @router.post("/refresh", response_model=Token)
-async def refresh_token(refresh_token: str, db: AsyncSession = Depends(get_db)):
+async def refresh_token(
+        payload: RefreshTokenRequest,
+        db: AsyncSession = Depends(get_db)
+):
     """
     使用 Refresh Token 获取新的 Access Token
     """
-    payload = decode_token(refresh_token)
-    if not payload or payload.get("type") != "refresh":
+    token_payload = decode_token(payload.refresh_token)
+    if not token_payload or token_payload.get("type") != "refresh":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="无效的刷新令牌"
         )
 
-    user_id = int(payload.get("sub"))
+    user_id = int(token_payload.get("sub"))
     service = UserService(db)
     user = await service.get_by_id(user_id)
 

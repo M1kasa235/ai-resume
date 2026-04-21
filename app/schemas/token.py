@@ -13,3 +13,8 @@ class TokenPayload(BaseModel):
     sub: str  # 用户ID
     exp: int    # 过期时间戳
     type: str   # token类型：access/refresh
+
+
+class RefreshTokenRequest(BaseModel):
+    """刷新Token请求体"""
+    refresh_token: str

@@ -45,6 +45,8 @@ export const useUserStore = create<UserStore>()(
         set((state) => {
           state.token = token;
           state.refreshToken = refreshToken;
+          state.isAuthenticated = true;
+          state.isLoading = false;
         }),
 
       logout: () =>

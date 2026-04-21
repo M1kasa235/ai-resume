@@ -228,6 +228,37 @@ export interface UploadResumeResponse {
   message: string;
 }
 
+// ==================== AI面试相关类型 ====================
+export interface AIInterviewMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  created_at?: string;
+}
+
+export interface AIInterviewSession {
+  session_id: string;
+  job_title?: string;
+  company_name?: string;
+  interview_type?: 'hr' | 'technical' | 'comprehensive';
+  messages: AIInterviewMessage[];
+}
+
+export interface AIInterviewStartRequest {
+  job_title?: string;
+  company_name?: string;
+  interview_type?: 'hr' | 'technical' | 'comprehensive';
+}
+
+export interface AIInterviewReplyRequest {
+  session_id: string;
+  message: string;
+}
+
+export interface AIInterviewReplyResponse {
+  session_id: string;
+  reply: string;
+}
+
 // ==================== 首页相关类型 ====================
 export interface QuickAction {
   name: string;

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import {
   UserOutlined,
@@ -8,7 +8,9 @@ import {
   CameraOutlined,
 } from '@ant-design/icons';
 import { userApi } from '@services/api';
+import { useQuery } from '@tanstack/react-query';
 import { useUserStore } from '@stores/userStore';
+import { AxiosError } from 'axios';
 import {
   Card,
   Row,
@@ -21,24 +23,83 @@ import {
   Avatar,
   Space,
   message,
+  Select,
+  InputNumber,
 } from 'antd';
+import type { User } from '@/types';
 
 import styles from './Profile.module.scss';
 
 const { TabPane } = Tabs;
 
+interface ProfileFormValues {
+  real_name?: string;
+  gender?: 'male' | 'female' | 'other';
+  current_city?: string;
+  target_city?: string;
+  work_years?: number;
+  education?: 'high_school' | 'college' | 'bachelor' | 'master' | 'phd';
+}
+
 export default function Profile() {
-  const { user } = useUserStore();
+  const { user, setUser } = useUserStore();
   const [loading, setLoading] = useState(false);
   const [form] = Form.useForm();
 
-  const handleUpdateProfile = async (values: Record<string, string>) => {
+  const { data: profileData, isLoading: profileLoading, refetch } = useQuery({
+    queryKey: ['user-profile'],
+    queryFn: userApi.getProfile,
+  });
+
+  useEffect(() => {
+    const profile = profileData as {
+      username?: string;
+      email?: string;
+      phone?: string;
+      real_name?: string;
+      gender?: 'male' | 'female' | 'other';
+      current_city?: string;
+      target_city?: string;
+      work_years?: number;
+      education?: string;
+    } | undefined;
+    if (!profile) return;
+    form.setFieldsValue({
+      username: profile.username,
+      email: profile.email,
+      phone: profile.phone,
+      real_name: profile.real_name,
+      gender: profile.gender,
+      current_city: profile.current_city,
+      target_city: profile.target_city,
+      work_years: profile.work_years,
+      education: profile.education,
+    });
+    setUser(profile as User);
+  }, [profileData, form, setUser]);
+
+  const handleUpdateProfile = async (values: ProfileFormValues) => {
     setLoading(true);
     try {
-      await userApi.updateProfile(values);
+      const normalizedWorkYears =
+        typeof values.work_years === 'number' && Number.isFinite(values.work_years)
+          ? values.work_years
+          : undefined;
+      const payload = {
+        real_name: values.real_name?.trim() || undefined,
+        gender: values.gender || undefined,
+        current_city: values.current_city?.trim() || undefined,
+        target_city: values.target_city?.trim() || undefined,
+        work_years: normalizedWorkYears,
+        education: values.education?.trim() || undefined,
+      };
+      const updated = await userApi.updateProfile(payload);
+      setUser(updated as User);
+      await refetch();
       message.success('个人资料更新成功');
-    } catch (error) {
-      message.error('更新失败');
+    } catch (error: unknown) {
+      const axiosError = error as AxiosError<{ detail?: string }>;
+      message.error(axiosError.response?.data?.detail || '更新失败');
     } finally {
       setLoading(false);
     }
@@ -113,6 +174,7 @@ export default function Profile() {
                   form={form}
                   layout="vertical"
                   onFinish={handleUpdateProfile}
+                  disabled={profileLoading}
                   initialValues={{
                     username: user?.username,
                     email: user?.email,
@@ -129,9 +191,8 @@ export default function Profile() {
                       <Form.Item
                         name="username"
                         label="用户名"
-                        rules={[{ required: true, message: '请输入用户名' }]}
                       >
-                        <Input prefix={<UserOutlined />} />
+                        <Input prefix={<UserOutlined />} disabled />
                       </Form.Item>
                     </Col>
                     <Col xs={24} sm={12}>
@@ -146,18 +207,28 @@ export default function Profile() {
                       <Form.Item
                         name="email"
                         label="邮箱"
-                        rules={[{ required: true, type: 'email' }]}
                       >
-                        <Input prefix={<MailOutlined />} />
+                        <Input prefix={<MailOutlined />} disabled />
                       </Form.Item>
                     </Col>
                     <Col xs={24} sm={12}>
                       <Form.Item
                         name="phone"
                         label="手机号"
-                        rules={[{ pattern: /^1[3-9]\d{9}$/, message: '请输入有效的手机号' }]}
                       >
-                        <Input prefix={<PhoneOutlined />} />
+                        <Input prefix={<PhoneOutlined />} disabled />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} sm={12}>
+                      <Form.Item name="gender" label="性别">
+                        <Select
+                          allowClear
+                          options={[
+                            { label: '男', value: 'male' },
+                            { label: '女', value: 'female' },
+                            { label: '其他', value: 'other' },
+                          ]}
+                        />
                       </Form.Item>
                     </Col>
                     <Col xs={24} sm={12}>
@@ -181,7 +252,7 @@ export default function Profile() {
                         name="work_years"
                         label="工作年限"
                       >
-                        <Input type="number" />
+                        <InputNumber min={0} max={50} style={{ width: '100%' }} />
                       </Form.Item>
                     </Col>
                     <Col xs={24} sm={12}>
@@ -189,7 +260,17 @@ export default function Profile() {
                         name="education"
                         label="学历"
                       >
-                        <Input />
+                        <Select
+                          allowClear
+                          placeholder="请选择学历"
+                          options={[
+                            { label: '高中', value: 'high_school' },
+                            { label: '大专', value: 'college' },
+                            { label: '本科', value: 'bachelor' },
+                            { label: '硕士', value: 'master' },
+                            { label: '博士', value: 'phd' },
+                          ]}
+                        />
                       </Form.Item>
                     </Col>
                   </Row>

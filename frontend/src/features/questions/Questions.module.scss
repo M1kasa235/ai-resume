@@ -133,3 +133,25 @@
 .loading {
   padding: 48px 0;
 }
+
+.practicePanel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.practiceMeta {
+  display: flex;
+  gap: 8px;
+}
+
+.optionGroup {
+  width: 100%;
+}
+
+.resultPanel {
+  padding: 12px;
+  border-radius: 8px;
+  background: #fafafa;
+  border: 1px solid #f0f0f0;
+}
