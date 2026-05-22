@@ -1,9 +1,9 @@
 [project]
 name = "ai-job-assistant"
 version = "0.1.0"
-description = "AI Job Assistant with LangChain Agent"
+description = "Offer Pilot — AI Job Assistant with Multi-Agent Architecture"
 authors = [
-    {name = "Your Name", email = "your.email@example.com"}
+    {name = "Peng Anxu"}
 ]
 dependencies = [
     # FastAPI 框架
@@ -63,5 +63,4 @@ dev-dependencies = [
     "pytest-asyncio>=0.24.0",
     "black>=23.0.0",
     "mypy>=1.0.0",
-    "httpx>=0.27.0",
 ]

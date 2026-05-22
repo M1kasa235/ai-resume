@@ -1,13 +1,14 @@
-# AI Job Assistant - Backend
+# Offer Pilot — AI Job Assistant
 
-AI 求职助手后端 API，基于 FastAPI + SQLAlchemy 构建，提供岗位管理、简历投递、AI 面试模拟等功能。
+基于 FastAPI + LangChain 的全栈 AI 求职助手，提供多智能体协作、长期记忆、RAG 增强检索、AI 模拟面试等功能。
 
-## 🚀 快速开始
+## 快速开始
 
 ### 环境要求
 
 - Python 3.10+
 - MySQL 8.0+
+- [uv](https://docs.astral.sh/uv/) (推荐) 或 pip
 
 ### 安装步骤
 
@@ -17,127 +18,144 @@ git clone https://github.com/M1kasa235/ai-resume.git
 cd ai-resume
 ```
 
-2. **创建虚拟环境**
+2. **安装依赖**
 ```bash
-python -m venv .venv
-.venv\Scripts\activate  # Windows
-source .venv/bin/activate  # Linux/Mac
-```
+# 使用 uv（推荐）
+uv sync
 
-3. **安装依赖**
-```bash
+# 或使用 pip
 pip install -r requirements.txt
 ```
 
-4. **配置环境变量**
+3. **配置环境变量**
 ```bash
-# 复制示例配置文件
-cp .env.example .env  # Linux/Mac
-# 或 copy .env.example .env  # Windows
-
-# 编辑 .env 文件，修改数据库配置和 SECRET_KEY
-# ⚠️ 重要：不要将 .env 文件提交到 Git！
+cp .env.example .env
+# 编辑 .env，修改数据库密码、API Key 等配置
 ```
 
-5. **创建数据库**
+4. **创建数据库**
 ```sql
 CREATE DATABASE ai_job CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+
+5. **数据库迁移**
+```bash
+alembic upgrade head
 ```
 
 6. **启动服务**
 ```bash
 python run.py
+# 或: uvicorn app.main:app --host 127.0.0.1 --port 8080 --reload
 ```
 
-服务将在 http://127.0.0.1:8002 启动
+服务启动后访问 http://127.0.0.1:8080
 
-## 📚 API 文档
+## API 文档
 
-启动服务后访问：
-- Swagger UI: http://127.0.0.1:8002/docs
-- ReDoc: http://127.0.0.1:8002/redoc
+- Swagger UI: http://127.0.0.1:8080/docs
+- ReDoc: http://127.0.0.1:8080/redoc
 
-## 🛠️ 技术栈
+## Docker
 
-- **Web 框架**: FastAPI 0.115
-- **数据库**: MySQL + SQLAlchemy 2.0 (Async)
-- **认证**: JWT (python-jose)
-- **数据验证**: Pydantic V2
-- **密码加密**: bcrypt
-- **AI Agent**: LangChain
+```bash
+docker build -t offer-pilot .
+docker run -p 8080:8080 --env-file .env offer-pilot
+```
 
-## 📁 项目结构
+## 技术栈
+
+| 层次 | 技术 |
+|------|------|
+| Web 框架 | FastAPI 0.115 |
+| 数据库 | MySQL + SQLAlchemy 2.0 (Async) + aiosqlite |
+| 迁移 | Alembic |
+| 认证 | JWT (python-jose) + bcrypt |
+| 数据验证 | Pydantic V2 |
+| AI Agent | LangChain (create_agent) |
+| LLM | DashScope / DeepSeek |
+| 向量库 | ChromaDB |
+| RAG | 混合检索 (BM25 + 向量) + 重排序 |
+| 前端 | React + TypeScript + Vite |
+
+## 项目结构
 
 ```
 app/
-├── api/v1/          # API 路由
-│   ├── auth.py      # 认证接口
-│   ├── jobs.py      # 岗位接口
-│   ├── user.py      # 用户接口
-│   ├── dashboard.py # 数据统计
-│   ├── workbench.py # 工作台
-│   └── questions.py # 题库
-├── core/            # 核心配置
-│   ├── config.py    # 环境变量
-│   ├── security.py  # 安全工具
-│   └── exceptions.py# 异常处理
-├── models/          # 数据模型
-├── schemas/         # Pydantic 模型
-├── services/        # 业务逻辑
-└── db/              # 数据库会话
+├── agents/             # AI Agent 多智能体架构
+│   ├── supervisor.py   # 主管 Agent（编排）
+│   ├── agent.py        # 求职顾问 Agent
+│   ├── resume_agent.py # 简历专家 Agent
+│   ├── interview_agent.py # 面试官 Agent
+│   ├── memory_agent.py # 记忆管家 Agent
+│   ├── memory.py       # 长期记忆服务
+│   ├── pre_process.py  # 预处理（意图分类 + 上下文注入）
+│   ├── config.py       # Agent 共享配置
+│   ├── registry.py     # Agent 统一注册中心
+│   ├── trace.py        # 结构化调用追踪
+│   └── tools/          # Agent 工具集
+├── api/v1/             # API 路由
+│   ├── agent_chat.py   # 统一对话入口
+│   ├── interview.py    # AI 面试
+│   ├── memory.py       # 记忆管理
+│   ├── rag.py          # RAG 知识库
+│   ├── resume_optimize.py # 简历优化
+│   └── ...             # 其他 API
+├── core/               # 核心配置
+├── models/             # 数据模型
+├── schemas/            # Pydantic Schema
+├── services/           # 业务逻辑
+├── rag/                # RAG 管道
+│   ├── core/           # 向量存储、分块、解析
+│   ├── ingestion/      # 文档摄入
+│   ├── retrieval/      # 混合检索 + 重排序
+│   ├── pipeline/       # 简历优化 + 岗位匹配
+│   └── services/       # RAG 服务层
+└── db/                 # 数据库会话
 ```
 
-## 🔑 主要功能
+## 多智能体架构
 
-- ✅ 用户注册/登录（JWT 认证）
-- ✅ 岗位管理（CRUD + 多维度搜索）
-- ✅ 简历上传与管理
-- ✅ 投递记录跟踪
-- ✅ Dashboard 数据统计
-- ✅ 题库系统
-- ✅ 收藏功能
+```
+用户请求 → Supervisor → Resume Agent (简历诊断/优化/匹配)
+                      → Career Agent (搜岗位/薪资/推荐/资讯)
+                      → Memory Agent (长期记忆管理)
+                      → Interview Agent (AI 模拟面试)
+```
 
-## ⚙️ 配置说明
+### 长期记忆系统
 
-关键环境变量（`.env` 文件）：
+- **写入**: Memory Agent 自主判断新增/更新/删除，支持 overwrite 和 append 模式
+- **注入**: 基于 3D 相关性评分（内容匹配 + 时间衰减 + 访问频次）定向注入上下文
+- **衰减**: 按重要度分级自动过期清理（1级 7 天 ~ 4级 180 天）
+- **分类**: fact / preference / insight / goal
+
+## 配置说明
+
+关键环境变量：
 
 ```env
-# 数据库配置
+# 数据库
 MYSQL_HOST=localhost
 MYSQL_PORT=3306
 MYSQL_USER=root
 MYSQL_PASSWORD=your_password
 MYSQL_DB=ai_job
 
-# JWT 密钥（生产环境务必修改）
+# JWT
 SECRET_KEY=your-secret-key
 
-# CORS 配置
+# LLM
+DASHSCOPE_API_KEY=your_api_key
+DEEPSEEK_API_KEY=your_api_key
+
+# 搜索
+TAVILY_API_KEY=your_api_key
+
+# CORS
 CORS_ORIGINS=["http://localhost:5173"]
 ```
 
-生成强 SECRET_KEY：
-```bash
-python -c "import secrets; print(secrets.token_urlsafe(32))"
-```
-
-## 🧪 测试
-
-```bash
-pytest
-```
-
-## 📝 注意事项
-
-1. **首次运行**会自动创建数据库表（开发模式）
-2. **生产环境**请修改 `SECRET_KEY` 为强密码
-3. **上传文件**存储在 `uploads/` 目录
-4. **限流中间件**默认禁用，需要时可在 `main.py` 中启用
-
-## 🤝 贡献
-
-欢迎提交 Issue 和 Pull Request！
-
-## 📄 许可证
+## 许可证
 
 MIT License
