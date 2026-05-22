@@ -26,10 +26,7 @@ export interface Token {
 
 const instance: AxiosInstance = axios.create({
   baseURL: BASE_URL,
-  timeout: 30000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  timeout: 60000,
 });
 
 let isRefreshing = false;
@@ -50,6 +47,10 @@ instance.interceptors.request.use(
     const { token } = useUserStore.getState();
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+    // 仅在非 FormData 请求时设置 JSON Content-Type，避免破坏文件上传的 multipart boundary
+    if (config.data && !(config.data instanceof FormData) && config.headers) {
+      config.headers['Content-Type'] = 'application/json';
     }
     return config;
   },

@@ -14,6 +14,7 @@ export interface User {
   is_admin: boolean;
   created_at: string;
   updated_at: string;
+  last_login_at?: string;
 }
 
 export interface LoginRequest {

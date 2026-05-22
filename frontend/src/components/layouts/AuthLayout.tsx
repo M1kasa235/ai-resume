@@ -7,7 +7,7 @@ export default function AuthLayout() {
     <div className={styles.container}>
       <div className={styles.left}>
         <div className={styles.content}>
-          <h1>AI Job Assistant</h1>
+          <h1>Offer Pilot</h1>
           <p>智能求职助手，助你找到理想工作</p>
         </div>
       </div>

@@ -15,11 +15,11 @@ router = APIRouter(prefix="/workbench", tags=["工作台"])
 
 @router.post("/resume/upload")
 async def upload_resume(
-    file: UploadFile = File(..., description="简历 PDF 文件"),
+    file: UploadFile = File(..., description="简历文件（PDF 或 TXT）"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """上传个人简历 PDF"""
+    """上传个人简历（支持 PDF 和 TXT 格式）"""
     service = WorkbenchService(db)
     return await service.upload_resume(current_user.id, file)
 

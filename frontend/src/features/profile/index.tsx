@@ -93,8 +93,8 @@ export default function Profile() {
         work_years: normalizedWorkYears,
         education: values.education?.trim() || undefined,
       };
-      const updated = await userApi.updateProfile(payload);
-      setUser(updated as User);
+      const updated = await userApi.updateProfile(payload) as any;
+      setUser(updated?.data || updated);
       await refetch();
       message.success('个人资料更新成功');
     } catch (error: unknown) {

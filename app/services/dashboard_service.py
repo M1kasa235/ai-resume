@@ -43,7 +43,7 @@ class DashboardService:
             },
             {
                 "name": "AI面试",
-                "path": "/ai-interviews",
+                "path": "/ai-interview",
                 "icon": "robot",
                 "description": "开始AI模拟面试"
             },
@@ -64,23 +64,25 @@ class DashboardService:
     async def _get_statistics(self, user_id: int) -> Dict:
         """获取用户统计数据"""
         from app.models.job import UserFavoriteJob
-        
-        # 由于 Application 模型可能还未定义，使用原始SQL方式
-        # 这里先返回默认值，后续需要根据实际模型调整
+
         total_applications = await self._count_applications(user_id)
         total_ai_interviews = await self._count_ai_interviews(user_id)
         total_practices = await self._count_practices(user_id)
         favorite_jobs = await self._count_favorite_jobs(user_id)
         accuracy_rate = await self._calculate_accuracy(user_id)
         completed_interviews = await self._count_completed_interviews(user_id)
-        
+        resume_completeness = await self._calculate_resume_completeness(user_id)
+
         return {
             "total_applications": total_applications,
             "total_ai_interviews": total_ai_interviews,
             "total_practices": total_practices,
             "favorite_jobs": favorite_jobs,
             "accuracy_rate": round(accuracy_rate, 2),
-            "completed_interviews": completed_interviews
+            "completed_interviews": completed_interviews,
+            "resume_completeness": resume_completeness,
+            "practice_goal": 500,
+            "application_goal": 100,
         }
 
     async def _count_applications(self, user_id: int) -> int:
@@ -145,6 +147,28 @@ class DashboardService:
             return (correct / total) * 100
         except (ImportError, AttributeError):
             return 0.0
+
+    async def _calculate_resume_completeness(self, user_id: int) -> int:
+        """计算简历完善度"""
+        try:
+            from app.models import User
+            stmt = select(User).where(User.id == user_id)
+            result = await self.db.execute(stmt)
+            user = result.scalar_one_or_none()
+            if not user:
+                return 0
+
+            fields = [
+                bool(user.real_name),
+                bool(user.current_city),
+                bool(user.target_city),
+                bool(user.education),
+                bool(user.work_years is not None),
+            ]
+            filled = sum(fields)
+            return int((filled / len(fields)) * 100)
+        except (ImportError, AttributeError):
+            return 0
 
     async def _count_completed_interviews(self, user_id: int) -> int:
         """统计完成的AI面试数量"""

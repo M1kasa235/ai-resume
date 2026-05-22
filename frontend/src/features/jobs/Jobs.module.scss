@@ -1,101 +1,310 @@
-.jobs {
-  h1 {
-    margin-bottom: 24px;
-    font-size: 32px;
-    font-weight: 600;
-  }
-}
-
-.searchCard {
-  margin-bottom: 24px;
-}
-
-.jobCard {
-  height: 100%;
+.jobsPage {
+  height: calc(100vh - 64px - 24px - 32px);
   display: flex;
   flex-direction: column;
-
-  .ant-card-body {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-  }
+  overflow: hidden;
 }
 
-.jobHeader {
+.filterCard {
   margin-bottom: 16px;
-
-  h3 {
-    margin: 0 0 8px 0;
-    font-size: 18px;
-    font-weight: 600;
-  }
-
-  .company {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: #666;
-    font-size: 14px;
-  }
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  flex-shrink: 0;
 }
 
-.jobInfo {
+/* ====== 结果区域外层 ====== */
+.resultsWrapper {
   flex: 1;
+  min-height: 0;
+}
+
+.resultsWrapper > :global(.ant-row) {
+  height: 100%;
+}
+
+.resultsWrapper > :global(.ant-row) > :global(.ant-col) {
+  height: 100%;
+}
+
+.resultsWrapper :global(.ant-col > .ant-card) {
+  height: 100%;
+}
+
+/* ====== 结果卡片 ====== */
+.resultCard {
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  height: 100%;
+}
+
+.resultCard :global(.ant-card-body) {
+  height: calc(100% - 46px);
+  padding: 12px 16px !important;
+  overflow: hidden;
+}
+
+.resultTitle {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.sortLabel {
+  color: #999;
+  font-size: 13px;
+}
+
+/* ====== 岗位列表项 ====== */
+.jobItem {
+  padding: 16px 20px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: box-shadow 0.25s, transform 0.25s;
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  min-height: 130px;
+}
+
+.jobItem:hover {
+  border-color: #d9d9d9;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
+.jobItemInner {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-
-  .location {
-    color: #666;
-    font-size: 14px;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
-
-  .tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-  }
-
-  .jobStats {
-    display: flex;
-    gap: 16px;
-    color: #999;
-    font-size: 12px;
-  }
+  height: 100%;
 }
 
-.hotJob {
+/* 第1行：标题 + 薪资 + 操作 */
+.jobItemRow1 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.jobItemTitle {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1a1a;
+  line-height: 1.4;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.urgentDot {
+  font-size: 11px;
+  line-height: 18px;
+  padding: 0 6px;
+  flex-shrink: 0;
+}
+
+.jobItemSalary {
+  font-size: 16px;
+  font-weight: 700;
+  color: #f5222d;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.jobItemActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.jobItemFav {
+  font-size: 17px;
+  cursor: pointer;
+  color: #d9d9d9;
+  padding: 2px;
+  transition: color 0.2s;
+}
+
+.jobItemFav:hover {
+  color: #f5222d;
+}
+
+.jobItemApply {
+  font-size: 12px;
+  height: 28px;
+  padding: 0 14px;
+  border-radius: 6px;
+}
+
+/* 第2行：公司 + 地点 + 经验 */
+.jobItemRow2 {
+  font-size: 13px;
+  color: #8c8c8c;
+  line-height: 1.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 4px;
+}
+
+.jobItemDot {
+  color: #e8e8e8;
+  margin: 0 6px;
+}
+
+/* 第3行：标签 */
+.jobItemRow3 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+  flex-shrink: 0;
+}
+
+.jobItemTag {
+  font-size: 12px;
+  padding: 0 10px;
+  line-height: 22px;
+  border-radius: 4px;
+  background: #f5f5f5;
+  border: none;
+  color: #666;
+}
+
+/* 第4行：统计信息 */
+.jobItemRow4 {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: auto;
+  padding-top: 8px;
+  font-size: 12px;
+  color: #bfbfbf;
+}
+
+.jobItemStat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ====== 侧边栏 ====== */
+.sidebarTitle {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.sidebarCard {
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  height: 100%;
+}
+
+.sidebarCard :global(.ant-card-body) {
+  height: calc(100% - 46px);
+  overflow-y: auto;
+}
+
+/* ====== 热门岗位列表 ====== */
+.hotJobItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
   padding: 12px 0;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid #f5f5f5;
+  cursor: pointer;
+  transition: background 0.15s;
 
   &:last-child {
     border-bottom: none;
   }
 
-  h4 {
-    margin: 0 0 4px 0;
-    font-size: 16px;
-    font-weight: 500;
-  }
-
-  p {
-    margin: 0 0 8px 0;
-    color: #666;
-    font-size: 14px;
-  }
-
-  .hotJobInfo {
-    display: flex;
-    justify-content: space-between;
-    color: #999;
-    font-size: 12px;
+  &:hover {
+    .hotJobTitle {
+      color: #1677ff;
+    }
   }
 }
 
+.hotJobRank {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  background: #f5f5f5;
+  color: #999;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+
+  &[data-top="true"] {
+    background: linear-gradient(135deg, #ff4d4f, #ff7a45);
+    color: #fff;
+  }
+}
+
+.hotJobContent {
+  flex: 1;
+  min-width: 0;
+}
+
+.hotJobTitle {
+  margin: 0 0 2px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: color 0.15s;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hotJobCompany {
+  margin: 0 0 4px;
+  font-size: 12px;
+  color: #999;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hotJobSalary {
+  font-size: 13px;
+  font-weight: 600;
+  color: #ff4d4f;
+}
+
+/* ====== 无限滚动 ====== */
+.scrollArea {
+  height: 100%;
+  overflow-y: auto;
+}
+
 .loading {
-  padding: 48px 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sentinel {
+  text-align: center;
+  padding: 16px;
+}
+
+.noMore {
+  color: #bbb;
+  font-size: 13px;
+}
+
+/* ====== 响应式 ====== */
+@media (max-width: 576px) {
+  .filterCard {
+    margin-bottom: 12px;
+  }
 }

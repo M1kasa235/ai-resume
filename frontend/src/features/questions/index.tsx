@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 import { questionApi } from '@services/api';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -42,11 +42,26 @@ export default function Questions() {
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
   const [answer, setAnswer] = useState('');
   const [practiceStartAt, setPracticeStartAt] = useState<number | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [submitResult, setSubmitResult] = useState<{
     is_correct: boolean;
     correct_answer?: string;
     explanation?: string;
   } | null>(null);
+
+  // 练习计时器
+  useEffect(() => {
+    if (!practiceVisible || submitResult) {
+      setElapsedSeconds(0);
+      return;
+    }
+    const timer = setInterval(() => {
+      if (practiceStartAt) {
+        setElapsedSeconds(Math.floor((Date.now() - practiceStartAt) / 1000));
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [practiceVisible, submitResult, practiceStartAt]);
 
   const { data: questionsData, isLoading } = useQuery({
     queryKey: ['questions', searchParams],
@@ -328,21 +343,30 @@ export default function Questions() {
       </Tabs>
 
       <Modal
-        title={currentQuestion ? `题目练习：${currentQuestion.title}` : '题目练习'}
+        title={currentQuestion ? `题目练习` : '题目练习'}
         open={practiceVisible}
         onCancel={closePractice}
         width={760}
         footer={
-          <Space>
-            <Button onClick={closePractice}>关闭</Button>
-            <Button
-              type="primary"
-              onClick={handleSubmitAnswer}
-              loading={submitAnswerMutation.isPending}
-              disabled={!currentQuestion}
-            >
-              提交答案
-            </Button>
+          <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+            <div>
+              {currentQuestion && (
+                <span style={{ color: '#999', fontSize: 13 }}>
+                  耗时：{Math.floor(elapsedSeconds / 60)}分{elapsedSeconds % 60}秒
+                </span>
+              )}
+            </div>
+            <Space>
+              <Button onClick={closePractice}>关闭</Button>
+              <Button
+                type="primary"
+                onClick={handleSubmitAnswer}
+                loading={submitAnswerMutation.isPending}
+                disabled={!currentQuestion || !!submitResult}
+              >
+                提交答案
+              </Button>
+            </Space>
           </Space>
         }
       >
@@ -352,7 +376,12 @@ export default function Questions() {
               {renderDifficulty(currentQuestion.difficulty)}
               <Tag>{renderType(currentQuestion.type)}</Tag>
             </div>
-            {currentQuestion.content && <Typography.Paragraph>{currentQuestion.content}</Typography.Paragraph>}
+            <h3 style={{ marginBottom: 16 }}>{currentQuestion.title}</h3>
+            {currentQuestion.content && (
+              <Typography.Paragraph style={{ background: '#fafafa', padding: 12, borderRadius: 8, lineHeight: 1.8 }}>
+                {currentQuestion.content}
+              </Typography.Paragraph>
+            )}
 
             {currentQuestion.options?.length ? (
               <Radio.Group
@@ -362,9 +391,14 @@ export default function Questions() {
               >
                 <Space direction="vertical" style={{ width: '100%' }}>
                   {currentQuestion.options.map((option, index) => (
-                    <Radio key={index} value={String(option)}>
-                      {option}
-                    </Radio>
+                    <div
+                      key={index}
+                      className={`${styles.optionItem} ${answer === String(option) ? styles.optionItemActive : ''}`}
+                    >
+                      <Radio value={String(option)}>
+                        {option}
+                      </Radio>
+                    </div>
                   ))}
                 </Space>
               </Radio.Group>
@@ -379,8 +413,8 @@ export default function Questions() {
 
             {submitResult && (
               <div className={styles.resultPanel}>
-                <Tag color={submitResult.is_correct ? 'success' : 'error'}>
-                  {submitResult.is_correct ? '回答正确' : '回答错误'}
+                <Tag color={submitResult.is_correct ? 'success' : 'error'} style={{ marginBottom: 8, fontSize: 13, padding: '2px 12px' }}>
+                  {submitResult.is_correct ? '✓ 回答正确' : '✗ 回答错误'}
                 </Tag>
                 {submitResult.correct_answer && (
                   <Typography.Paragraph>

@@ -1,68 +1,86 @@
 .workbench {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+
   h1 {
     margin-bottom: 24px;
     font-size: 32px;
     font-weight: 600;
+    flex-shrink: 0;
   }
 }
 
-.resumeCard {
+.mainRow {
+  flex: 1;
+  min-height: 0;
+}
+
+.leftCol {
   display: flex;
-  align-items: center;
-  gap: 24px;
-  padding: 24px;
-  background: #f8f9fa;
-  border-radius: 8px;
-
-  .resumeInfo {
-    flex: 1;
-
-    h3 {
-      margin: 0 0 8px 0;
-      font-size: 18px;
-      font-weight: 600;
-    }
-
-    p {
-      margin: 0 0 16px 0;
-      color: #666;
-    }
-  }
+  flex-direction: column;
 }
 
-.statCard {
+.resumeCardWrapper {
+  flex-shrink: 0;
+}
+
+.resumeHeader {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 16px;
-  background: #f8f9fa;
+}
+
+.resumePreview {
+  flex: 1;
+  min-height: 0;
+  border: 1px solid #f0f0f0;
   border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
 
-  .statIcon {
-    width: 48px;
-    height: 48px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #e6f7ff;
-    border-radius: 50%;
-    color: #1890ff;
-    font-size: 24px;
-  }
+.emptyResume {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  border: 2px dashed #d9d9d9;
+  border-radius: 8px;
+  background: #fafafa;
+}
 
-  .statContent {
-    flex: 1;
+.emptyText {
+  color: #999;
+  font-size: 16px;
+  margin: 0;
+}
 
-    .statNumber {
-      font-size: 24px;
-      font-weight: 600;
-      color: #1890ff;
-      margin-bottom: 4px;
-    }
+.resumeIframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+}
 
-    .statLabel {
-      color: #666;
-      font-size: 14px;
+.rightCol {
+  display: flex;
+  flex-direction: column;
+}
+
+.tableCard {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+
+  :global {
+    .ant-card-body {
+      flex: 1;
+      overflow: auto;
     }
   }
 }
@@ -102,4 +120,114 @@
 .loading {
   padding: 48px 0;
   text-align: center;
+}
+
+// ==================== 简历优化样式 ====================
+.optimizeContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.optimizeCard {
+  flex-shrink: 0;
+}
+
+.resultSection {
+  margin-top: 16px;
+  padding: 16px;
+  background: #fafafa;
+  border-radius: 8px;
+}
+
+.suggestionItem {
+  margin-bottom: 8px;
+  padding: 8px;
+  background: #fff;
+  border-radius: 4px;
+  border: 1px solid #f0f0f0;
+}
+
+.diffBlock {
+  display: flex;
+  gap: 16px;
+  margin: 8px 0;
+}
+
+.diffOriginal {
+  flex: 1;
+  padding: 8px;
+  background: #fff2f0;
+  border-radius: 4px;
+  border: 1px solid #ffccc7;
+}
+
+.diffOptimized {
+  flex: 1;
+  padding: 8px;
+  background: #f6ffed;
+  border-radius: 4px;
+  border: 1px solid #b7eb8f;
+}
+
+.optimizeSection {
+  margin-bottom: 16px;
+}
+
+// ==================== 简历问答样式 ====================
+.qaContainer {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.qaCard {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+
+  :global {
+    .ant-card-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+  }
+}
+
+.qaMessages {
+  flex: 1;
+  min-height: 300px;
+  max-height: 500px;
+  overflow-y: auto;
+  margin-bottom: 16px;
+}
+
+.qaMessage {
+  margin-bottom: 8px;
+}
+
+.qaQuestion {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-bottom: 4px;
+}
+
+.qaAnswer {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-bottom: 4px;
+}
+
+.qaReferences {
+  margin-left: 40px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.qaInput {
+  flex-shrink: 0;
 }

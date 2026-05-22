@@ -13,6 +13,10 @@ const JobDetail = lazy(() => import('@features/jobs/Detail'));
 const Questions = lazy(() => import('@features/questions'));
 const Workbench = lazy(() => import('@features/workbench'));
 const AIInterview = lazy(() => import('@features/aiInterview'));
+const AIInterviewReport = lazy(() => import('@features/aiInterview/Report'));
+const AIInterviewHistory = lazy(() => import('@features/aiInterview/History'));
+const AIAdvisor = lazy(() => import('@features/aiAdvisor'));
+const Admin = lazy(() => import('@features/admin'));
 const Profile = lazy(() => import('@features/profile'));
 const Settings = lazy(() => import('@features/settings'));
 
@@ -79,6 +83,26 @@ export const routes: AppRoute[] = [
         path: 'ai-interview',
         element: <AIInterview />,
         meta: { title: 'AI面试', icon: 'RobotOutlined', breadcrumb: 'AI面试' },
+      },
+      {
+        path: 'ai-interview/report/:id',
+        element: <AIInterviewReport />,
+        meta: { title: '面试报告', icon: 'RobotOutlined', breadcrumb: '面试报告' },
+      },
+      {
+        path: 'ai-interview/history',
+        element: <AIInterviewHistory />,
+        meta: { title: '面试记录', icon: 'RobotOutlined', breadcrumb: '面试记录' },
+      },
+      {
+        path: 'ai-advisor',
+        element: <AIAdvisor />,
+        meta: { title: 'AI求职顾问', icon: 'MessageOutlined', breadcrumb: 'AI求职顾问' },
+      },
+      {
+        path: 'admin',
+        element: <Admin />,
+        meta: { title: '管理后台', icon: 'SettingOutlined', breadcrumb: '管理后台', admin: true },
       },
       {
         path: 'profile',

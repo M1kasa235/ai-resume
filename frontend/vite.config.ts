@@ -28,10 +28,10 @@ export default defineConfig(({ mode }) => {
         registerType: 'autoUpdate',
         includeAssets: ['favicon.ico', 'robots.txt', 'apple-touch-icon.png'],
         manifest: {
-          name: 'AI Job Assistant',
-          short_name: 'AI Job',
-          description: 'AI-powered job search assistant',
-          theme_color: '#1890ff',
+          name: 'Offer Pilot',
+          short_name: 'Offer Pilot',
+          description: '智能求职助手 — AI 驱动的求职、面试与简历优化平台',
+          theme_color: '#1677ff',
           background_color: '#ffffff',
           display: 'standalone',
           icons: [

@@ -1,49 +1,250 @@
 .dashboard {
-  h1 {
-    margin-bottom: 24px;
-    font-size: 24px;
-    font-weight: 600;
-  }
-}
-
-.statTitle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  
-  .anticon {
-    font-size: 20px;
-  }
-}
-
-.chartPlaceholder {
-  padding: 40px;
-  text-align: center;
-  background: #f5f5f5;
-  border-radius: 8px;
-  
-  p {
-    margin: 8px 0;
-    color: #666;
-  }
-}
-
-.growthPanel {
+  height: calc(100vh - 64px - 24px - 32px);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  overflow: hidden;
+  padding: 0;
 }
 
-.summaryRow {
+.rowSection {
+  flex-shrink: 0;
+}
+
+.flexSection {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.flexSection :global(.ant-row) {
+  height: 100%;
+}
+
+.flexSection :global(.ant-col) {
+  height: 100%;
+}
+
+.flexSection :global(.ant-col > .ant-card) {
+  height: 100%;
+}
+
+/* ====== 欢迎横幅 ====== */
+.welcomeBanner {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 50%, #3d92e8 100%);
+  border-radius: 12px;
+  padding: 16px 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+.welcomeContent {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+  z-index: 1;
+}
+
+.welcomeCenter {
+  flex: 1;
+  text-align: center;
+  padding: 0 24px;
+}
+
+.welcomeTitle {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+}
+
+.welcomeDate {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 12px;
+  margin: 4px 0 0;
+}
+
+.welcomeEncourage {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+
+.welcomeStats {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.welcomeStatItem {
+  text-align: center;
+}
+
+.welcomeStatValue {
+  display: block;
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.2;
+}
+
+.welcomeStatLabel {
+  display: block;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+  margin-top: 2px;
+}
+
+.welcomeStatDivider {
+  width: 1px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.welcomeDecoration {
+  position: absolute;
+  right: -10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 80px;
+  color: rgba(255, 255, 255, 0.04);
+}
+
+/* ====== 统计卡片 ====== */
+.statCard {
+  border-radius: 12px;
+  overflow: hidden;
+  border: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.statCard:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+}
+
+.statCard :global(.ant-card-body) {
+  padding: 0 !important;
+}
+
+.statCardInner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.statLeft {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.statIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: #fff;
+}
+
+.statLabel {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.75);
+  margin-bottom: 2px;
+}
+
+.statValue {
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.2;
+}
+
+.statTag {
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 11px;
+  padding: 2px 12px;
+}
+
+/* ====== 区块通用 ====== */
+.sectionCard {
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  border: none;
+}
+
+.fillCard {
+  height: 100%;
+}
+
+.fillCard :global(.ant-card-body) {
+  height: calc(100% - 42px);
+  display: flex;
+  flex-direction: column;
+}
+
+.sectionCard :global(.ant-card-head) {
+  border-bottom: 1px solid #f0f0f0;
+  padding: 10px 16px;
+  min-height: 0;
+}
+
+.sectionCard :global(.ant-card-body) {
+  padding: 12px 16px;
+}
+
+.sectionTitle {
+  font-size: 16px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.viewAll {
+  font-size: 13px;
+  color: #999;
+  transition: color 0.2s;
+}
+
+.viewAll:hover {
+  color: #1677ff;
+}
+
+/* ====== 成长曲线 ====== */
+.growthPanel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.growthMeta {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.metaTag {
+  font-size: 12px;
+  padding: 2px 12px;
+  border-radius: 20px;
 }
 
 .legendRow {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 16px;
   align-items: center;
 }
 
@@ -51,6 +252,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  font-size: 13px;
 }
 
 .legendDot {
@@ -60,106 +262,207 @@
   display: inline-block;
 }
 
-.dotApplications {
-  background: #1677ff;
-}
-
-.dotPractices {
-  background: #722ed1;
-}
-
-.dotInterviews {
-  background: #52c41a;
-}
-
 .chartArea {
+  flex: 1;
+  border-top: 1px solid #f0f0f0;
+  padding: 8px 0 0;
+  min-height: 0;
+}
+
+/* ====== 学习进度 ====== */
+.progressSection {
+  flex: 1;
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 10px;
-  min-height: 160px;
-  padding: 12px 8px;
+  flex-direction: column;
+  gap: 12px;
+  justify-content: center;
+}
+
+.progressCard {
+  background: #fafafa;
+  padding: 10px 14px;
   border-radius: 8px;
+}
+
+.progressHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 10px;
+}
+
+.progressPercent {
+  margin-left: auto;
+  font-weight: 700;
+  font-size: 16px;
+  color: #333;
+}
+
+/* ====== 最近动态 ====== */
+.activityList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  max-height: 320px;
+  padding-right: 4px;
+}
+
+.activityList::-webkit-scrollbar {
+  width: 4px;
+}
+
+.activityList::-webkit-scrollbar-thumb {
+  background: #e0e0e0;
+  border-radius: 2px;
+}
+
+.activityItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-radius: 8px;
+  transition: background 0.2s;
+  cursor: default;
+}
+
+.activityItem:hover {
   background: #fafafa;
 }
 
-.chartGroup {
+.activityIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 6px;
-  min-width: 36px;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
 }
 
-.barApplications,
-.barPractices,
-.barInterviews {
-  width: 10px;
-  border-radius: 6px;
+.activityContent {
+  flex: 1;
+  min-width: 0;
 }
 
-.barApplications {
-  background: #1677ff;
+.activityTitle {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
 }
 
-.barPractices {
-  background: #722ed1;
-}
-
-.barInterviews {
-  background: #52c41a;
-}
-
-.chartLabel {
-  color: #999;
+.activityDesc {
   font-size: 12px;
+  color: #999;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.progress {
-  .progressItem {
-    margin-bottom: 24px;
-    
-    span {
-      display: block;
-      margin-bottom: 8px;
-      font-weight: 500;
-    }
-  }
+.activityTime {
+  font-size: 12px;
+  color: #ccc;
+  flex-shrink: 0;
+  margin-left: 8px;
 }
 
-.quickActions {
+/* ====== 快速操作 ====== */
+.quickGrid {
+  flex: 1;
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
+  grid-template-columns: 1fr 1fr;
+  grid-auto-rows: 1fr;
+  gap: 12px;
 }
 
-.actionCard {
+.quickItem {
+  border-radius: 12px;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 24px;
   text-align: center;
-  cursor: pointer;
-  transition: all 0.3s;
-  border: 1px solid #f0f0f0;
-  border-radius: 8px;
-  
-  &:hover {
-    border-color: #1890ff;
-    box-shadow: 0 2px 8px rgba(24, 144, 255, 0.2);
-    
-    span {
-      color: #1890ff;
-    }
+  gap: 6px;
+  user-select: none;
+}
+
+.quickItem:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.quickItem:active {
+  transform: scale(0.95);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.quickIcon {
+  font-size: 30px;
+  color: #fff;
+}
+
+.quickLabel {
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.quickDesc {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.3;
+}
+
+@media (max-width: 576px) {
+  .welcomeContent {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
   }
-  
-  .anticon {
-    margin-bottom: 8px;
+
+  .welcomeStats {
+    width: 100%;
+    justify-content: space-around;
   }
-  
-  span {
-    font-size: 14px;
-    color: #666;
+
+  .quickGrid {
+    gap: 12px;
   }
+}
+
+/* ====== 入场动画 ====== */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.welcomeBanner {
+  animation: fadeInUp 0.5s ease-out;
+}
+
+.statCard {
+  animation: fadeInUp 0.5s ease-out;
+  animation-fill-mode: both;
+}
+
+.statCard:nth-child(1) { animation-delay: 0.05s; }
+.statCard:nth-child(2) { animation-delay: 0.1s; }
+.statCard:nth-child(3) { animation-delay: 0.15s; }
+.statCard:nth-child(4) { animation-delay: 0.2s; }
+
+.sectionCard {
+  animation: fadeInUp 0.5s ease-out 0.25s both;
 }

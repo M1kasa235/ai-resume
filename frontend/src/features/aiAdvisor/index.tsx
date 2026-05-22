@@ -1,0 +1,176 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { message as antMessage } from 'antd';
+
+import { advisorApi } from '@services/api';
+import type { ChatMessage } from '@/types/api';
+
+import SessionList from './components/SessionList';
+import ChatArea from './components/ChatArea';
+import MessageInput from './components/MessageInput';
+import styles from './Advisor.module.scss';
+
+interface Session {
+  id: string;
+  title: string;
+  created_at: string;
+}
+
+function getStorageKey(): string {
+  try {
+    const stored = JSON.parse(localStorage.getItem('user-storage') || '{}');
+    const userId = stored?.state?.user?.id || 'anonymous';
+    return `advisor-sessions-${userId}`;
+  } catch {
+    return 'advisor-sessions-anonymous';
+  }
+}
+
+function generateId(): string {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+function loadSessions(): Session[] {
+  try {
+    const newKey = getStorageKey();
+    const data = localStorage.getItem(newKey);
+    if (data) return JSON.parse(data);
+
+    // 迁移旧 key 下的会话数据（单 key → 按用户隔离 key）
+    const oldData = localStorage.getItem('advisor-sessions');
+    if (oldData) {
+      const oldSessions = JSON.parse(oldData);
+      localStorage.setItem(newKey, JSON.stringify(oldSessions));
+      localStorage.removeItem('advisor-sessions');
+      return oldSessions;
+    }
+    return [];
+  } catch {
+    return [];
+  }
+}
+
+function saveSessions(sessions: Session[]) {
+  localStorage.setItem(getStorageKey(), JSON.stringify(sessions));
+}
+
+export default function AIAdvisor() {
+  const [sessions, setSessions] = useState<Session[]>(loadSessions);
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(() => {
+    return sessions[0]?.id || generateId();
+  });
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [streaming, setStreaming] = useState(false);
+  const [streamingContent, setStreamingContent] = useState('');
+  const streamingRef = useRef('');
+
+  // 初始化：如果没有会话，自动创建一个
+  useEffect(() => {
+    if (sessions.length === 0) {
+      const id = generateId();
+      const newSession: Session = { id, title: '新对话', created_at: new Date().toISOString() };
+      setSessions([newSession]);
+      saveSessions([newSession]);
+      setActiveThreadId(id);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 切换会话时加载历史消息
+  useEffect(() => {
+    if (!activeThreadId) return;
+    advisorApi
+      .getMessages(activeThreadId)
+      .then((data) => setMessages(data.messages || []))
+      .catch(() => setMessages([]));
+  }, [activeThreadId]);
+
+  const handleNewSession = useCallback(() => {
+    const id = generateId();
+    const newSession: Session = { id, title: '新对话', created_at: new Date().toISOString() };
+    const updated = [newSession, ...sessions];
+    setSessions(updated);
+    saveSessions(updated);
+    setActiveThreadId(id);
+    setMessages([]);
+  }, [sessions]);
+
+  const handleDeleteSession = useCallback(
+    (id: string) => {
+      const updated = sessions.filter((s) => s.id !== id);
+      setSessions(updated);
+      saveSessions(updated);
+      if (activeThreadId === id) {
+        const nextId = updated[0]?.id || null;
+        setActiveThreadId(nextId);
+      }
+    },
+    [sessions, activeThreadId],
+  );
+
+  const updateSessionTitle = useCallback(
+    (threadId: string, title: string) => {
+      const updated = sessions.map((s) =>
+        s.id === threadId ? { ...s, title: title.slice(0, 30) + (title.length > 30 ? '...' : '') } : s,
+      );
+      setSessions(updated);
+      saveSessions(updated);
+    },
+    [sessions],
+  );
+
+  const handleSend = useCallback(
+    async (content: string) => {
+      if (!activeThreadId) return;
+
+      // 第一条消息自动作为会话标题
+      const session = sessions.find((s) => s.id === activeThreadId);
+      if (session && session.title === '新对话') {
+        updateSessionTitle(activeThreadId, content);
+      }
+
+      const userMsg: ChatMessage = { role: 'user', content };
+      setMessages((prev) => [...prev, userMsg]);
+      setStreaming(true);
+      setStreamingContent('');
+      streamingRef.current = '';
+
+      await advisorApi.chatStream(
+        { message: content, image_url: '', thread_id: activeThreadId },
+        (chunk) => {
+          streamingRef.current += chunk;
+          setStreamingContent(streamingRef.current);
+        },
+        () => {
+          setStreaming(false);
+          setStreamingContent('');
+          const finalContent = streamingRef.current;
+          streamingRef.current = '';
+          setMessages((prev) => [
+            ...prev,
+            { role: 'assistant', content: finalContent },
+          ]);
+        },
+        () => {
+          setStreaming(false);
+          antMessage.error('发送失败，请重试');
+        },
+      );
+    },
+    [activeThreadId, sessions, updateSessionTitle],
+  );
+
+  return (
+    <div className={styles.advisor}>
+      <SessionList
+        sessions={sessions}
+        activeId={activeThreadId}
+        onSelect={setActiveThreadId}
+        onNew={handleNewSession}
+        onDelete={handleDeleteSession}
+      />
+      <div className={styles.main}>
+        <ChatArea messages={messages} streaming={streaming} streamingContent={streamingContent} />
+        <MessageInput onSend={handleSend} disabled={!activeThreadId || streaming} />
+      </div>
+    </div>
+  );
+}

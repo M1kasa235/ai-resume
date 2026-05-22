@@ -1,5 +1,5 @@
 # app/models/interview.py
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 from sqlalchemy import String, Text, Integer, BigInteger, Enum, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -54,6 +54,7 @@ class AIInterview(Base):
     application_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("applications.id"), nullable=True, comment="关联投递记录")
     
     job_title: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, comment="目标岗位名称")
+    company_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, comment="目标公司名称")
     job_description: Mapped[Optional[str]] = mapped_column(Text, nullable=True, comment="目标岗位JD")
     
     interview_type: Mapped[str] = mapped_column(
@@ -63,7 +64,7 @@ class AIInterview(Base):
     )
     
     status: Mapped[str] = mapped_column(
-        Enum('ongoing', 'completed', 'aborted'),
+        Enum('ongoing', 'evaluating', 'completed', 'aborted'),
         default='ongoing'
     )
     
@@ -77,7 +78,9 @@ class AIInterview(Base):
     weakness_analysis: Mapped[Optional[str]] = mapped_column(Text, nullable=True, comment="待改进点")
     improvement_suggestions: Mapped[Optional[str]] = mapped_column(Text, nullable=True, comment="改进建议")
     
-    transcript: Mapped[Optional[list]] = mapped_column(String(500), nullable=True, comment="完整对话记录JSON")
+    transcript: Mapped[Optional[str]] = mapped_column(Text, nullable=True, comment="完整对话记录JSON")
+
+    report_markdown: Mapped[Optional[str]] = mapped_column(Text, nullable=True, comment="完整Markdown评估报告")
     
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     

@@ -4,12 +4,14 @@ import {
   GlobalOutlined,
   UserOutlined,
 } from '@ant-design/icons';
+import { useUserStore } from '@stores/userStore';
 import {
   Card,
   Row,
   Col,
   Switch,
   Button,
+  Select,
   Space,
   message,
 } from 'antd';
@@ -17,6 +19,8 @@ import {
 import styles from './Settings.module.scss';
 
 export default function Settings() {
+  const { user } = useUserStore();
+
   const handleSave = () => {
     message.success('设置已保存');
   };
@@ -138,11 +142,15 @@ export default function Settings() {
                     </div>
                   </div>
                   <div className={styles.settingsItemRight}>
-                    <select className={styles.languageSelect}>
-                      <option value="zh-CN">简体中文</option>
-                      <option value="zh-TW">繁體中文</option>
-                      <option value="en">English</option>
-                    </select>
+                    <Select
+                      defaultValue="zh-CN"
+                      style={{ width: 140 }}
+                      options={[
+                        { label: '简体中文', value: 'zh-CN' },
+                        { label: '繁體中文', value: 'zh-TW' },
+                        { label: 'English', value: 'en' },
+                      ]}
+                    />
                   </div>
                 </div>
               </Col>
@@ -166,19 +174,19 @@ export default function Settings() {
             <div className={styles.accountInfo}>
               <div className={styles.infoItem}>
                 <span>用户名：</span>
-                <span>user123</span>
+                <span>{user?.username || '-'}</span>
               </div>
               <div className={styles.infoItem}>
                 <span>邮箱：</span>
-                <span>user@example.com</span>
+                <span>{user?.email || '-'}</span>
               </div>
               <div className={styles.infoItem}>
                 <span>注册时间：</span>
-                <span>2024-01-01</span>
+                <span>{user?.created_at ? new Date(user.created_at).toLocaleDateString('zh-CN') : '-'}</span>
               </div>
               <div className={styles.infoItem}>
                 <span>最后登录：</span>
-                <span>2024-01-15 14:30</span>
+                <span>{user?.last_login_at ? new Date(user.last_login_at).toLocaleString('zh-CN') : '-'}</span>
               </div>
             </div>
           </Card>

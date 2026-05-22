@@ -1,7 +1,7 @@
 export const APP_CONFIG = {
-  name: 'AI Job Assistant',
+  name: 'Offer Pilot',
   version: '1.0.0',
-  description: 'AI-powered job search assistant',
+  description: '智能求职助手 — AI 驱动的求职、面试与简历优化平台',
   author: 'AI Team',
   repository: 'https://github.com/your-org/ai-job-assistant',
   homepage: 'https://ai-job-assistant.com',

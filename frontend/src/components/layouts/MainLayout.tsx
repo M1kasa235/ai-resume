@@ -5,6 +5,7 @@ import {
   SearchOutlined,
   QuestionCircleOutlined,
   RobotOutlined,
+  MessageOutlined,
   ToolOutlined,
   UserOutlined,
   SettingOutlined,
@@ -12,6 +13,7 @@ import {
   BellOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  SafetyCertificateOutlined,
 } from '@ant-design/icons';
 import { useUserStore } from '@stores/userStore';
 import { Layout, Menu, Avatar, Dropdown, Button, Badge, theme } from 'antd';
@@ -21,34 +23,6 @@ import styles from './MainLayout.module.scss';
 
 const { Header, Sider, Content } = Layout;
 
-const menuItems = [
-  {
-    key: '/dashboard',
-    icon: <DashboardOutlined />,
-    label: '仪表盘',
-  },
-  {
-    key: '/jobs',
-    icon: <SearchOutlined />,
-    label: '岗位搜索',
-  },
-  {
-    key: '/questions',
-    icon: <QuestionCircleOutlined />,
-    label: '题库练习',
-  },
-  {
-    key: '/ai-interview',
-    icon: <RobotOutlined />,
-    label: 'AI面试',
-  },
-  {
-    key: '/workbench',
-    icon: <ToolOutlined />,
-    label: '工作台',
-  },
-];
-
 export default function MainLayout() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -57,6 +31,59 @@ export default function MainLayout() {
   const {
     token: { colorBgContainer, borderRadiusLG },
   } = theme.useToken();
+
+  const menuItems: any[] = [
+    {
+      key: '/dashboard',
+      icon: <DashboardOutlined />,
+      label: '仪表盘',
+    },
+    {
+      key: '/jobs',
+      icon: <SearchOutlined />,
+      label: '岗位搜索',
+    },
+    {
+      key: '/questions',
+      icon: <QuestionCircleOutlined />,
+      label: '题库练习',
+    },
+    {
+      key: '/ai-interview',
+      icon: <RobotOutlined />,
+      label: 'AI面试',
+    },
+    {
+      key: '/ai-advisor',
+      icon: <MessageOutlined />,
+      label: 'AI求职顾问',
+    },
+    {
+      key: '/workbench',
+      icon: <ToolOutlined />,
+      label: '工作台',
+    },
+    ...(user?.is_admin
+      ? [
+          {
+            key: '/admin',
+            icon: <SafetyCertificateOutlined />,
+            label: '管理后台',
+          },
+        ]
+      : []),
+    { type: 'divider', key: 'divider' },
+    {
+      key: '/profile',
+      icon: <UserOutlined />,
+      label: '个人中心',
+    },
+    {
+      key: '/settings',
+      icon: <SettingOutlined />,
+      label: '设置',
+    },
+  ];
 
   const handleMenuClick = ({ key }: { key: string }) => {
     navigate(key);
@@ -108,7 +135,7 @@ export default function MainLayout() {
       >
         <div className={styles.logo}>
           <img src="/logo.svg" alt="Logo" />
-          {!collapsed && <span>AI Job Assistant</span>}
+          {!collapsed && <span>Offer Pilot</span>}
         </div>
         <Menu
           theme="dark"

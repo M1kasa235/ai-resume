@@ -20,6 +20,9 @@ class StatisticsSummary(BaseModel):
     favorite_jobs: int = Field(0, description="收藏岗位数")
     accuracy_rate: float = Field(0.0, description="正确率百分比")
     completed_interviews: int = Field(0, description="完成面试数")
+    resume_completeness: int = Field(0, description="简历完善度百分比")
+    practice_goal: int = Field(500, description="刷题目标数")
+    application_goal: int = Field(100, description="投递目标数")
 
 
 class DashboardOverviewResponse(BaseModel):

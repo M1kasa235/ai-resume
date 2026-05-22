@@ -1,0 +1,80 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'app/**'
+      - 'pyproject.toml'
+      - 'requirements.txt'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - 'pyproject.toml'
+      - 'requirements.txt'
+
+jobs:
+  lint-and-test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: testpass
+          MYSQL_DATABASE: ai_job_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio black mypy httpx
+
+      - name: Run linting (black)
+        run: black --check app/
+
+      - name: Run type checking (mypy)
+        run: mypy app/ --ignore-missing-imports || true
+
+      - name: Run tests
+        env:
+          MYSQL_HOST: 127.0.0.1
+          MYSQL_PORT: 3306
+          MYSQL_USER: root
+          MYSQL_PASSWORD: testpass
+          MYSQL_DB: ai_job_test
+          SECRET_KEY: test-secret-key-for-ci-only
+          DASHSCOPE_API_KEY: skip
+          DASHSCOPE_BASE_URL: skip
+          CORS_ORIGINS: '["http://localhost:5173"]'
+        run: pytest app/tests/ -v --tb=short
+
+  security:
+    name: Security Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for hardcoded secrets
+        run: |
+          ! grep -r "your-super-secret-key-change-this-in-production" app/ || \
+            (echo "ERROR: Default SECRET_KEY found in source code" && exit 1)
+          ! grep -r "mysql80" app/core/config.py || \
+            (echo "ERROR: Default database password found in config.py" && exit 1)

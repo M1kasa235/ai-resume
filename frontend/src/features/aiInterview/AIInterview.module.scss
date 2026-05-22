@@ -1,48 +1,124 @@
-.aiInterview {
-  h1 {
-    margin-bottom: 24px;
-    font-size: 24px;
-    font-weight: 600;
-  }
+.page {
+  height: calc(100vh - 64px - 24px - 32px);
+  overflow-y: auto;
+  padding: 0 2px;
 }
 
-.setupCard {
-  margin-bottom: 16px;
-}
+// ── 主页面 ──
 
-.chatCard {
-  :global(.ant-list-items) {
-    max-height: 420px;
-    overflow-y: auto;
-  }
-}
-
-.userItem {
-  justify-content: flex-end;
-}
-
-.assistantItem {
-  justify-content: flex-start;
-}
-
-.bubble {
-  max-width: 80%;
-  padding: 10px 12px;
+.configCard {
   border-radius: 10px;
-  background: #f5f7fa;
+  height: fit-content;
 }
 
-.userItem .bubble {
-  background: #e6f4ff;
+.historyCard {
+  border-radius: 10px;
 }
 
-.role {
-  margin-bottom: 6px;
-  color: #8c8c8c;
-  font-size: 12px;
+.historyList {
+  max-height: calc(100vh - 64px - 24px - 32px - 100px);
+  overflow-y: auto;
 }
 
-.actions {
+.historyItem {
+  padding: 14px 0 !important;
+  border-bottom: 1px solid #f0f0f0;
+  border-radius: 8px;
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &:hover {
+    background: #fafafa;
+  }
+}
+
+// ── 面试弹窗 ──
+
+.chatContainer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #f5f6f8;
+}
+
+.chatMessages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 24px;
+}
+
+.userMsg {
   display: flex;
   justify-content: flex-end;
+  margin-bottom: 14px;
+}
+
+.aiMsg {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 14px;
+}
+
+.userBubble {
+  max-width: 70%;
+  padding: 10px 14px;
+  border-radius: 12px 12px 4px 12px;
+  background: #1677ff;
+  color: #fff;
+}
+
+.aiBubble {
+  max-width: 70%;
+  padding: 10px 14px;
+  border-radius: 12px 12px 12px 4px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.bubbleRole {
+  margin-bottom: 4px;
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+.userBubble .bubbleRole {
+  opacity: 0.7;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.bubbleContent {
+  font-size: 14px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+.typing {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  color: #999;
+  font-size: 13px;
+}
+
+.endHint {
+  margin: 8px 24px 0;
+  border-radius: 6px;
+}
+
+.chatInput {
+  display: flex;
+  align-items: flex-end;
+  padding: 12px 24px 20px;
+  background: #fff;
+  border-top: 1px solid #eee;
+}
+
+.modalFooter {
+  display: flex;
+  justify-content: center;
 }

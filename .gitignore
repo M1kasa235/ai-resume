@@ -60,11 +60,6 @@ Thumbs.db
 uploads/*
 !uploads/.gitkeep
 
-# Test files (临时测试脚本)
-test_*.py
-debug_*.py
-check_*.py
-
 # Documentation (如果不需要可以注释掉)
 # *.md
 # IMPROVEMENTS_SUMMARY.md

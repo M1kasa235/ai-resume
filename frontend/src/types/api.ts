@@ -228,6 +228,99 @@ export interface UploadResumeResponse {
   message: string;
 }
 
+// ==================== RAG 相关类型 ====================
+export interface ReferenceItem {
+  content: string;
+  section: string;
+}
+
+export interface ResumeQueryResponse {
+  answer: string;
+  references: ReferenceItem[];
+}
+
+export interface MatchScore {
+  dimension: string;
+  score: number;
+  reason: string;
+}
+
+export interface JobMatchResponse {
+  overall_score: number;
+  scores: MatchScore[];
+  analysis: string;
+  suggestions: string[];
+}
+
+// ==================== 简历优化相关类型 ====================
+export interface ResumeDiagnoseResponse {
+  overall_score: string;
+  strengths: string[];
+  weaknesses: string[];
+  suggestions: Array<{
+    section: string;
+    issue: string;
+    advice: string;
+  }>;
+}
+
+export interface OptimizedSection {
+  section: string;
+  original: string;
+  optimized: string;
+  change_reason: string;
+}
+
+export interface OptimizeResponse {
+  optimized_sections: OptimizedSection[];
+  full_resume: string;
+  summary: Record<string, unknown>;
+}
+
+export interface PolishResponse {
+  original: string;
+  optimized: string;
+  change_reason: string;
+}
+
+// ==================== 简历版本管理相关类型 ====================
+export interface VersionItem {
+  id: number;
+  version: number;
+  source: string;
+  summary?: string;
+  job_id?: number;
+  created_at: string;
+}
+
+export interface VersionDetail {
+  id: number;
+  version: number;
+  source: string;
+  content: string;
+  summary?: string;
+  job_id?: number;
+  created_at: string;
+}
+
+export interface VersionListResponse {
+  versions: VersionItem[];
+}
+
+export interface CompareItem {
+  section: string;
+  before: string;
+  after: string;
+}
+
+export interface CompareResponse {
+  v1_id: number;
+  v2_id: number;
+  v1_version: number;
+  v2_version: number;
+  changes: CompareItem[];
+}
+
 // ==================== AI面试相关类型 ====================
 export interface AIInterviewMessage {
   role: 'user' | 'assistant' | 'system';
@@ -239,6 +332,7 @@ export interface AIInterviewSession {
   session_id: string;
   job_title?: string;
   company_name?: string;
+  job_description?: string;
   interview_type?: 'hr' | 'technical' | 'comprehensive';
   messages: AIInterviewMessage[];
 }
@@ -247,6 +341,7 @@ export interface AIInterviewStartRequest {
   job_title?: string;
   company_name?: string;
   interview_type?: 'hr' | 'technical' | 'comprehensive';
+  job_description?: string;
 }
 
 export interface AIInterviewReplyRequest {
@@ -257,6 +352,61 @@ export interface AIInterviewReplyRequest {
 export interface AIInterviewReplyResponse {
   session_id: string;
   reply: string;
+  limit_reached?: boolean;
+}
+
+// 逐题评估
+export interface QAEvaluation {
+  sequence: number;
+  question?: string;
+  answer?: string;
+  score?: number;
+  comment?: string;
+  suggested_answer?: string;
+}
+
+// 结束面试响应
+export interface AIInterviewEndResponse {
+  session_id: string;
+  status: string;
+  total_questions: number;
+  overall_score?: number;
+  strength_analysis?: string;
+  weakness_analysis?: string;
+  improvement_suggestions?: string;
+  report_markdown?: string;
+  evaluations: QAEvaluation[];
+}
+
+// 报告详情
+export interface AIInterviewReport {
+  session_id: string;
+  job_title?: string;
+  company_name?: string;
+  interview_type?: string;
+  status: string;
+  total_questions: number;
+  overall_score?: number;
+  strength_analysis?: string;
+  weakness_analysis?: string;
+  improvement_suggestions?: string;
+  report_markdown?: string;
+  evaluations: QAEvaluation[];
+  started_at?: string;
+  ended_at?: string;
+}
+
+// 报告列表项
+export interface AIInterviewReportListItem {
+  session_id: string;
+  job_title?: string;
+  company_name?: string;
+  interview_type?: string;
+  status: string;
+  total_questions: number;
+  overall_score?: number;
+  started_at?: string;
+  ended_at?: string;
 }
 
 // ==================== 首页相关类型 ====================
@@ -274,6 +424,9 @@ export interface StatisticsSummary {
   favorite_jobs: number;
   accuracy_rate: number;
   completed_interviews: number;
+  resume_completeness: number;
+  practice_goal: number;
+  application_goal: number;
 }
 
 export interface DashboardOverviewResponse {
@@ -317,6 +470,95 @@ export interface ActivityRecord {
 export interface ActivitiesResponse {
   activities: ActivityRecord[];
   total: number;
+}
+
+// ==================== AI求职顾问相关类型 ====================
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+// ==================== 管理后台类型 ====================
+export interface KnowledgeChunk {
+  id: string;
+  content: string;
+  metadata: Record<string, any>;
+}
+
+export interface KnowledgeStats {
+  collections: Array<{
+    name: string;
+    document_count: number;
+    type: string;
+    partitions?: Record<string, {
+      parent: number;
+      child: number;
+      total: number;
+      titles: string[];
+    }>;
+  }>;
+}
+
+export interface KnowledgePartition {
+  id: number | null;
+  doc_type: string;
+  name: string;
+  description: string;
+  parent_count: number;
+  child_count: number;
+  total: number;
+  titles: string[];
+  is_custom: boolean;
+}
+
+export interface KnowledgeDocument {
+  id: string;
+  parent_id: string;
+  title: string;
+  category: string;
+  content: string;
+  content_full: string;
+  doc_type: string;
+  source_file: string;
+}
+
+export interface ChunkItem {
+  id: string;
+  content: string;
+  metadata: Record<string, any>;
+  child_index?: number;
+}
+
+export interface DocumentChunksResponse {
+  parent: ChunkItem;
+  children: ChunkItem[];
+  child_count: number;
+}
+
+// ==================== 简历知识库管理相关类型 ====================
+export interface ResumeUser {
+  user_id: number;
+  chunk_count: number;
+  section_count: number;
+  sections: string[];
+}
+
+export interface ResumeSection {
+  section: string;
+  label: string;
+  chunk_count: number;
+}
+
+export interface ResumeChunkItem {
+  id: string;
+  content: string;
+  metadata: {
+    chunk_index: number;
+    total_chunks: number;
+    source: string;
+    created_at: string;
+    section: string;
+  };
 }
 
 // ==================== 收藏相关类型 ====================

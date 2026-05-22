@@ -21,12 +21,30 @@ class WorkbenchService:
 
     async def upload_resume(self, user_id: int, file: UploadFile) -> Dict[str, str]:
         """
-        上传简历 PDF
+        上传简历（支持 PDF、TXT、DOC/DOCX），自动入库 RAG 向量库
         """
         # 1. 验证文件类型
-        if file.content_type != "application/pdf":
-            raise HTTPException(status_code=400, detail="只支持 PDF 格式的简历")
-        
+        allowed_types = {
+            "application/pdf": "pdf",
+            "text/plain": "txt",
+            "application/msword": "doc",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+        }
+        ext = allowed_types.get(file.content_type or "")
+        if not ext:
+            # 通过文件名后缀兜底判断
+            filename_lower = (file.filename or "").lower()
+            if filename_lower.endswith(".pdf"):
+                ext = "pdf"
+            elif filename_lower.endswith(".txt"):
+                ext = "txt"
+            elif filename_lower.endswith(".doc"):
+                ext = "doc"
+            elif filename_lower.endswith(".docx"):
+                ext = "docx"
+            else:
+                raise HTTPException(status_code=400, detail="只支持 PDF、TXT 或 Word 格式的简历")
+
         # 2. 验证文件大小 (限制为 10MB)
         file.file.seek(0, 2)  # 移动到文件末尾
         size = file.file.tell()
@@ -35,7 +53,6 @@ class WorkbenchService:
             raise HTTPException(status_code=400, detail="文件大小不能超过 10MB")
 
         # 3. 生成唯一文件名并保存
-        ext = "pdf"
         filename = f"{uuid.uuid4()}.{ext}"
         user_dir = os.path.join(self.upload_dir, str(user_id))
         os.makedirs(user_dir, exist_ok=True)
@@ -47,18 +64,32 @@ class WorkbenchService:
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"文件保存失败: {str(e)}")
 
-        # 4. 更新数据库中的简历路径
+        # 4. 入库 RAG 向量库（用于简历诊断、优化、问答）
+        try:
+            from app.rag.ingestion.resume import process_resume_file
+            result = process_resume_file(file_path, user_id)
+            if result.get("status") == "error":
+                print(f"RAG 入库失败: {result.get('message')}")
+                raise HTTPException(status_code=500, detail=f"简历解析失败: {result.get('message')}")
+        except HTTPException:
+            raise
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail=f"简历入库失败: {str(e)}")
+
+        # 5. 更新数据库中的简历路径
         resume_url = f"/uploads/resumes/{user_id}/{filename}"
         stmt = select(User).where(User.id == user_id)
         result = await self.db.execute(stmt)
         user = result.scalar_one_or_none()
-        
+
         if user:
             user.avatar_url = resume_url  # 暂时复用 avatar_url 字段存储简历路径
             await self.db.commit()
             await self.db.refresh(user)
 
-        return {"url": resume_url, "message": "上传成功"}
+        return {"url": resume_url, "message": "上传成功", "format": ext}
 
     async def get_resume_info(self, user_id: int) -> ResumeInfo:
         """获取当前用户的简历信息"""

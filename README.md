@@ -64,6 +64,7 @@ python run.py
 - **认证**: JWT (python-jose)
 - **数据验证**: Pydantic V2
 - **密码加密**: bcrypt
+- **AI Agent**: LangChain
 
 ## 📁 项目结构
 

@@ -36,6 +36,6 @@
     },
     "types": ["vitest/globals", "@testing-library/jest-dom"]
   },
-  "include": ["src", "tests", "vite.config.ts", ".storybook/**/*.ts"],
+  "include": ["src", "tests", ".storybook/**/*.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

@@ -1,0 +1,154 @@
+.report {
+  padding: 16px 24px;
+  max-width: 900px;
+  margin: 0 auto;
+  height: calc(100vh - 64px - 24px - 32px);
+  overflow-y: auto;
+}
+
+.loading,
+.error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 400px;
+  gap: 16px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+// ── Markdown 完整报告 ──
+
+.markdownCard {
+  border-radius: 10px;
+
+  h1 { font-size: 22px; }
+  h2 { font-size: 18px; }
+  h3 { font-size: 16px; }
+  p { line-height: 1.85; margin-bottom: 12px; }
+  strong { font-weight: 600; }
+}
+
+.mdList {
+  padding-left: 20px;
+  margin-bottom: 12px;
+}
+
+.mdListItem {
+  line-height: 1.8;
+  margin-bottom: 4px;
+}
+
+.mdHr {
+  border: none;
+  border-top: 2px solid #e8e8e8;
+  margin: 24px 0;
+}
+
+.mdCode {
+  display: block;
+  padding: 12px 16px;
+  background: #f6f8fa;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-x: auto;
+  margin-bottom: 12px;
+}
+
+.mdInlineCode {
+  padding: 1px 6px;
+  background: #f0f0f0;
+  border-radius: 4px;
+  font-size: 90%;
+  color: #d63384;
+}
+
+.mdBlockquote {
+  border-left: 4px solid #1677ff;
+  padding: 8px 16px;
+  margin: 12px 0;
+  background: #f0f5ff;
+  border-radius: 0 8px 8px 0;
+  color: #555;
+}
+
+.summary {
+  margin-bottom: 16px;
+
+  .scoreArea {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+    margin-bottom: 16px;
+  }
+
+  .scoreInfo {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .descriptions {
+    margin-top: 8px;
+  }
+}
+
+.analysis {
+  margin-bottom: 16px;
+}
+
+.evaluations {
+  margin-bottom: 24px;
+}
+
+.qaLabel {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.qaSeq {
+  font-weight: 700;
+  color: #1677ff;
+  min-width: 32px;
+}
+
+.qaTitle {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #333;
+}
+
+.qaDetail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 0;
+
+  p {
+    margin-bottom: 0;
+  }
+}
+
+.qaQuestion,
+.qaAnswer,
+.qaComment,
+.qaSuggested {
+  line-height: 1.7;
+}

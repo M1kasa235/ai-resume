@@ -3,6 +3,7 @@ import type {
   PaginatedResponse,
   Token,
   User,
+  ChatMessage,
   DashboardOverviewResponse,
   GrowthCurveResponse,
   ActivitiesResponse,
@@ -14,6 +15,24 @@ import type {
   AIInterviewStartRequest,
   AIInterviewReplyRequest,
   AIInterviewReplyResponse,
+  AIInterviewEndResponse,
+  AIInterviewReport,
+  AIInterviewReportListItem,
+  ResumeQueryResponse,
+  JobMatchResponse,
+  ResumeDiagnoseResponse,
+  OptimizeResponse,
+  PolishResponse,
+  VersionListResponse,
+  VersionDetail,
+  CompareResponse,
+  KnowledgeStats,
+  KnowledgePartition,
+  KnowledgeDocument,
+  DocumentChunksResponse,
+  ResumeUser,
+  ResumeSection,
+  ResumeChunkItem,
 } from '@/types/api';
 
 import http from './http';
@@ -305,9 +324,7 @@ export const workbenchApi = {
   uploadResume: async (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
-    return http.post<ApiResponse>('/api/v1/workbench/resume/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    return http.post<ApiResponse>('/api/v1/workbench/resume/upload', formData);
   },
 
   // 获取当前用户的简历信息及基础画像
@@ -332,6 +349,75 @@ export const workbenchApi = {
   },
 };
 
+// ==================== AI求职顾问接口 ====================
+export const advisorApi = {
+  // 流式对话（SSE）
+  chatStream: async (
+    data: { message: string; image_url?: string; thread_id: string },
+    onChunk: (text: string) => void,
+    onDone: () => void,
+    onError: (err: Error) => void,
+    signal?: AbortSignal,
+  ) => {
+    const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+    // 从 localStorage 直接读取 token（userStore 持久化存储）
+    let token: string | null = null;
+    try {
+      const stored = JSON.parse(localStorage.getItem('user-storage') || '{}');
+      token = stored?.state?.token || null;
+    } catch {}
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    try {
+      const response = await fetch(`${BASE_URL}/api/v1/agent/chat/stream`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(data),
+        signal,
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const reader = response.body!.getReader();
+      const decoder = new TextDecoder();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) { onDone(); break; }
+        const text = decoder.decode(value, { stream: true });
+        if (text) onChunk(text);
+      }
+    } catch (err: any) {
+      if (err.name !== 'AbortError') onError(err);
+    }
+  },
+
+  // 获取历史消息
+  getMessages: async (threadId: string) => {
+    const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+    let token: string | null = null;
+    try {
+      const stored = JSON.parse(localStorage.getItem('user-storage') || '{}');
+      token = stored?.state?.token || null;
+    } catch {}
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(`${BASE_URL}/api/v1/agent/chat/history?thread_id=${threadId}`, { headers });
+    return res.json() as Promise<{ messages: ChatMessage[] }>;
+  },
+
+  // 清空会话
+  clearMessages: async (threadId: string) => {
+    const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+    let token: string | null = null;
+    try {
+      const stored = JSON.parse(localStorage.getItem('user-storage') || '{}');
+      token = stored?.state?.token || null;
+    } catch {}
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    await fetch(`${BASE_URL}/api/v1/agent/chat/history?thread_id=${threadId}`, { method: 'DELETE', headers });
+  },
+};
+
 // ==================== 首页接口 ====================
 export const dashboardApi = {
   // 获取首页概览数据
@@ -347,6 +433,245 @@ export const dashboardApi = {
   // 获取个人最新动态
   getActivities: async (limit: number = 10) => {
     return http.get<ApiResponse<ActivitiesResponse>>('/api/v1/dashboard/activities', { params: { limit } });
+  },
+};
+
+// ==================== RAG 简历问答接口 ====================
+export const ragApi = {
+  queryResume: async (data: { question: string }) => {
+    const res = await http.post<ResumeQueryResponse>('/api/v1/rag/resume/query', data);
+    return (res as any) as ResumeQueryResponse;
+  },
+
+  matchJob: async (data: { job_id: number }) => {
+    const res = await http.post<JobMatchResponse>('/api/v1/rag/job/match', data);
+    return (res as any) as JobMatchResponse;
+  },
+};
+
+// ==================== 简历优化接口 ====================
+export const optimizeApi = {
+  diagnoseResume: async () => {
+    const res = await http.post<ResumeDiagnoseResponse>('/api/v1/resume/diagnose');
+    return (res as any) as ResumeDiagnoseResponse;
+  },
+
+  optimizeResume: async (data: { job_id: number }) => {
+    const res = await http.post<OptimizeResponse>('/api/v1/resume/optimize', data);
+    return (res as any) as OptimizeResponse;
+  },
+
+  polishSection: async (data: { section: string; content: string }) => {
+    const res = await http.post<PolishResponse>('/api/v1/resume/polish', data);
+    return (res as any) as PolishResponse;
+  },
+};
+
+// ==================== 简历版本管理接口 ====================
+export const versionApi = {
+  listVersions: async () => {
+    const res = await http.get<VersionListResponse>('/api/v1/resume/versions');
+    return (res as any) as VersionListResponse;
+  },
+
+  saveVersion: async (data: { content: string; source: string; summary?: string }) => {
+    const res = await http.post<any>('/api/v1/resume/versions', data);
+    return (res as any) as any;
+  },
+
+  getVersion: async (id: number) => {
+    const res = await http.get<VersionDetail>(`/api/v1/resume/versions/${id}`);
+    return (res as any) as VersionDetail;
+  },
+
+  compareVersions: async (v1: number, v2: number) => {
+    const res = await http.get<CompareResponse>(`/api/v1/resume/versions/${v1}/compare/${v2}`);
+    return (res as any) as CompareResponse;
+  },
+};
+
+// ==================== 管理后台接口 ====================
+export const adminApi = {
+  // 知识库统计
+  getKnowledgeStats: async () => {
+    return http.get<ApiResponse<KnowledgeStats>>('/api/v1/admin/knowledge/stats');
+  },
+
+  // 知识库文档块列表
+  listChunks: async (params: {
+    collection?: string;
+    user_id?: number;
+    page?: number;
+    page_size?: number;
+  }) => {
+    return http.get<ApiResponse>('/api/v1/admin/knowledge/chunks', { params });
+  },
+
+  // 删除文档块
+  deleteChunks: async (ids: string[], collection?: string) => {
+    const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+    const { token } = JSON.parse(localStorage.getItem('user-storage') || '{}')?.state || {};
+    const params = new URLSearchParams();
+    ids.forEach((id) => params.append('ids', id));
+    if (collection) params.append('collection', collection);
+    const res = await fetch(`${BASE_URL}/api/v1/admin/knowledge/chunks?${params}`, {
+      method: 'DELETE',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    return res.json();
+  },
+
+  // 删除用户的所有文档块
+  deleteUserChunks: async (userId: number) => {
+    return http.delete<ApiResponse>(`/api/v1/admin/knowledge/user/${userId}`);
+  },
+
+  // 导入岗位数据（CSV/JSON/PDF/DOCX/TXT）
+  importJobs: async (file: File, docType?: string) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const url = docType
+      ? `/api/v1/admin/knowledge/import?doc_type=${encodeURIComponent(docType)}`
+      : '/api/v1/admin/knowledge/import';
+    return http.post<ApiResponse>(url, formData);
+  },
+
+  // 创建题目
+  createQuestion: async (data: {
+    category_id: number;
+    type: string;
+    difficulty?: string;
+    title: string;
+    content?: string;
+    options?: any[];
+    correct_answer?: string;
+    explanation?: string;
+    code_template?: string;
+    test_cases?: any[];
+    tags?: string[];
+    company_tags?: string[];
+    is_hot?: boolean;
+  }) => {
+    return http.post<ApiResponse>('/api/v1/admin/questions', data);
+  },
+
+  // 更新题目
+  updateQuestion: async (id: number, data: any) => {
+    return http.put<ApiResponse>(`/api/v1/admin/questions/${id}`, data);
+  },
+
+  // 删除题目
+  deleteQuestion: async (id: number) => {
+    return http.delete<ApiResponse>(`/api/v1/admin/questions/${id}`);
+  },
+
+  // ==================== 知识库文档管理 ====================
+
+  // 获取所有知识库分区
+  getPartitions: async () => {
+    return http.get<ApiResponse<{ total: number; partitions: KnowledgePartition[] }>>('/api/v1/admin/knowledge/partitions');
+  },
+
+  // 创建分区
+  createPartition: async (data: { doc_key: string; name: string; description?: string }) => {
+    return http.post<ApiResponse>('/api/v1/admin/knowledge/partitions', data);
+  },
+
+  // 更新分区
+  updatePartition: async (id: number, data: { name?: string; description?: string }) => {
+    return http.put<ApiResponse>(`/api/v1/admin/knowledge/partitions/${id}`, data);
+  },
+
+  // 删除分区
+  deletePartition: async (id: number) => {
+    return http.delete<ApiResponse>(`/api/v1/admin/knowledge/partitions/${id}`);
+  },
+
+  // 种子默认分区
+  seedPartitions: async () => {
+    return http.post<ApiResponse>('/api/v1/admin/knowledge/partitions/seed');
+  },
+
+  // 获取某分区下的文档列表
+  getDocuments: async (params: {
+    doc_type: string;
+    page?: number;
+    page_size?: number;
+  }) => {
+    return http.get<ApiResponse<{ total: number; page: number; page_size: number; items: KnowledgeDocument[] }>>('/api/v1/admin/knowledge/documents', { params });
+  },
+
+  // 获取文档的分块详情
+  getDocumentChunks: async (parentId: string) => {
+    return http.get<ApiResponse<DocumentChunksResponse>>(`/api/v1/admin/knowledge/documents/${parentId}/chunks`);
+  },
+
+  // 创建知识文档
+  createDocument: async (data: {
+    title: string;
+    category?: string;
+    content: string;
+    doc_type: string;
+  }) => {
+    return http.post<ApiResponse>('/api/v1/admin/knowledge/documents', data);
+  },
+
+  // 更新知识文档
+  updateDocument: async (data: {
+    parent_id: string;
+    title: string;
+    category?: string;
+    content: string;
+    doc_type: string;
+  }) => {
+    return http.post<ApiResponse>('/api/v1/admin/knowledge/documents', data);
+  },
+
+  // 删除知识文档
+  deleteDocument: async (parentId: string) => {
+    return http.delete<ApiResponse>(`/api/v1/admin/knowledge/documents/${parentId}`);
+  },
+
+  // 上传 JSON 文件导入知识库
+  uploadKnowledgeFile: async (file: File, docType: string) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return http.post<ApiResponse>(`/api/v1/admin/knowledge/upload?doc_type=${encodeURIComponent(docType)}`, formData);
+  },
+
+  // ==================== 简历知识库管理 ====================
+
+  // 获取所有已上传简历的用户列表
+  getResumeUsers: async () => {
+    return http.get<ApiResponse<{ total: number; items: ResumeUser[] }>>('/api/v1/admin/resume/users');
+  },
+
+  // 获取某用户的简历分区（section）
+  getResumeSections: async (userId: number) => {
+    return http.get<ApiResponse<{ user_id: number; total_sections: number; total_chunks: number; items: ResumeSection[] }>>(`/api/v1/admin/resume/users/${userId}/sections`);
+  },
+
+  // 获取某用户某分区的所有分块
+  getResumeChunks: async (userId: number, section: string) => {
+    return http.get<ApiResponse<{ user_id: number; section: string; label: string; total: number; items: ResumeChunkItem[] }>>(`/api/v1/admin/resume/users/${userId}/sections/${section}`);
+  },
+
+  // 删除用户的所有简历文档块
+  deleteResumeUser: async (userId: number) => {
+    return http.delete<ApiResponse>(`/api/v1/admin/resume/users/${userId}`);
+  },
+
+  // 删除指定的简历文档块
+  deleteResumeChunks: async (ids: string[]) => {
+    const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+    const { token } = JSON.parse(localStorage.getItem('user-storage') || '{}')?.state || {};
+    const params = new URLSearchParams();
+    ids.forEach((id) => params.append('ids', id));
+    const res = await fetch(`${BASE_URL}/api/v1/admin/resume/chunks?${params}`, {
+      method: 'DELETE',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    return res.json();
   },
 };
 
@@ -369,6 +694,80 @@ export const aiInterviewApi = {
 
   // 结束会话
   endSession: async (sessionId: string) => {
-    return http.post<ApiResponse>(`/api/v1/ai-interview/sessions/${sessionId}/end`);
+    return http.post<ApiResponse<AIInterviewEndResponse>>(`/api/v1/ai-interview/sessions/${sessionId}/end`);
+  },
+
+  // 获取面试报告
+  getReport: async (sessionId: string) => {
+    return http.get<ApiResponse<AIInterviewReport>>(`/api/v1/ai-interview/reports/${sessionId}`);
+  },
+
+  // 获取历史报告列表
+  listReports: async (page = 1, size = 10) => {
+    return http.get<ApiResponse<{ total: number; items: AIInterviewReportListItem[] }>>(`/api/v1/ai-interview/reports?page=${page}&size=${size}`);
+  },
+
+  // 流式发送消息（SSE），实时接收 AI 追问
+  streamMessage: async (
+    sessionId: string,
+    message: string,
+    onToken: (token: string) => void,
+    onDone: (sequence: number) => void,
+    onError: (err: Error) => void,
+    signal?: AbortSignal,
+  ) => {
+    const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+    let token: string | null = null;
+    try {
+      const stored = JSON.parse(localStorage.getItem('user-storage') || '{}');
+      token = stored?.state?.token || null;
+    } catch { /* ignore */ }
+
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    try {
+      const response = await fetch(`${BASE_URL}/api/v1/ai-interview/sessions/${sessionId}/stream`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ session_id: sessionId, message }),
+        signal,
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error((err as any).detail || `HTTP ${response.status}`);
+      }
+
+      const reader = response.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.type === 'token') {
+                onToken(data.content as string);
+              } else if (data.type === 'done') {
+                onDone(data.sequence as number);
+              } else if (data.type === 'error') {
+                onError(new Error(data.message as string));
+              }
+            } catch { /* skip malformed JSON */ }
+          }
+        }
+      }
+    } catch (err: any) {
+      if (err.name !== 'AbortError') onError(err);
+    }
   },
 };

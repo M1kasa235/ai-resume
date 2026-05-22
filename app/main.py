@@ -1,12 +1,17 @@
 # app/main.py
 from contextlib import asynccontextmanager
 import logging
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 from app.core.config import settings
-from app.api.v1 import auth, user, jobs, dashboard, workbench, questions
+from app.api.v1 import auth, user, jobs, dashboard, workbench, questions, rag, resume_optimize, agent_chat, resume_versions, admin, interview, memory
 from app.db.session import engine
 from app.db.base import Base
 from app.core.exceptions import AppException
@@ -28,10 +33,31 @@ async def lifespan(app: FastAPI):
     关闭时：清理资源
     """
     # 启动事件
-    if settings.DEBUG:
+    try:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
-        print("数据库表已创建（开发模式）")
+        if settings.DEBUG:
+            print("数据库表已创建/确认")
+
+        # 长期记忆：建表 + 清理过期
+        try:
+            from app.agents.memory import MemoryService
+            ms = MemoryService()
+            await ms._ensure_table()
+            await ms.decay_all()
+            if settings.DEBUG:
+                print("长期记忆表已创建/确认，过期记忆已清理")
+        except Exception as e:
+            print(f"[WARNING] 记忆表初始化失败: {e}")
+
+        # 恢复卡住的评估任务（服务重启后）
+        try:
+            from app.api.v1.interview import recover_stuck_evaluations
+            await recover_stuck_evaluations()
+        except Exception as e:
+            print(f"[WARNING] 评估恢复失败（服务仍会启动）: {e}")
+    except Exception as e:
+        print(f"[WARNING] 数据库表创建失败（服务仍会启动）: {e}")
 
     yield
 
@@ -72,7 +98,14 @@ def create_application() -> FastAPI:
     app.include_router(dashboard.router, prefix=settings.API_V1_STR)
     app.include_router(workbench.router, prefix=settings.API_V1_STR)
     app.include_router(questions.router, prefix=settings.API_V1_STR)
-
+    app.include_router(rag.router, prefix=settings.API_V1_STR)
+    app.include_router(resume_optimize.router, prefix=settings.API_V1_STR)
+    app.include_router(agent_chat.router, prefix=settings.API_V1_STR)
+    app.include_router(resume_versions.router, prefix=settings.API_V1_STR)
+    app.include_router(admin.router, prefix=settings.API_V1_STR)
+    app.include_router(interview.router, prefix=settings.API_V1_STR)
+    app.include_router(memory.router, prefix=settings.API_V1_STR)
+    
     # 挂载静态文件目录（用于访问上传的简历 PDF）
     app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 

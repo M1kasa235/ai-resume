@@ -1,0 +1,37 @@
+"""LLM 模型实例集中管理 — 按场景分配不同 temperature（懒加载，避免 import 时初始化）"""
+
+from langchain.chat_models import init_chat_model
+from app.core.config import settings
+
+_MODEL_NAME = "deepseek-v4-flash"
+
+_chat_model = None
+_structured_model = None
+
+
+def get_chat_model():
+    """懒加载对话模型（temperature 0.7），适合聊天对话"""
+    global _chat_model
+    if _chat_model is None:
+        _chat_model = init_chat_model(
+            model=_MODEL_NAME,
+            model_provider="openai",
+            temperature=0.7,
+            base_url=settings.DEEPSEEK_API_KEY,
+            api_key=settings.DEEPSEEK_API_KEY,
+        )
+    return _chat_model
+
+
+def get_structured_model():
+    """懒加载结构化模型（temperature 0.3），适合 RAG 问答、简历诊断/优化"""
+    global _structured_model
+    if _structured_model is None:
+        _structured_model = init_chat_model(
+            model=_MODEL_NAME,
+            model_provider="openai",
+            temperature=0.3,
+            base_url=settings.DEEPSEEK_API_KEY,
+            api_key=settings.DEEPSEEK_API_KEY,
+        )
+    return _structured_model

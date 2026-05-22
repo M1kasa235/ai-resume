@@ -36,20 +36,6 @@
 }
 
 .settingsItemRight {
-  .languageSelect {
-    padding: 6px 12px;
-    border: 1px solid #d9d9d9;
-    border-radius: 4px;
-    background: #fff;
-    font-size: 14px;
-    cursor: pointer;
-
-    &:focus {
-      outline: none;
-      border-color: #1890ff;
-      box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
-    }
-  }
 }
 
 .settingsActions {
