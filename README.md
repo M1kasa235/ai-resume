@@ -17,6 +17,40 @@
 <!-- 预留：产品主截图 -->
 <!-- ![Offer Pilot 首页](./docs/screenshots/dashboard.png) -->
 
+## 系统架构
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                      前端 (React + Vite)                       │
+│  仪表盘 │ 岗位搜索 │ AI顾问 │ AI面试 │ 工作台 │ 管理后台        │
+└──────────────────────────┬───────────────────────────────────┘
+                           │ HTTP + SSE (流式对话)
+                           ▼
+┌──────────────────────────────────────────────────────────────┐
+│                   后端 (FastAPI :8080)                         │
+│                                                              │
+│  ┌─────────────┐  ┌──────────┐  ┌──────────────────────┐    │
+│  │ Supervisor   │  │ REST API │  │ RAG Pipeline          │    │
+│  │ (Agent 编排)  │  │ (CRUD)   │  │ 解析→分块→向量→检索    │    │
+│  └──────┬───────┘  └────┬─────┘  └──────────┬───────────┘    │
+│         │               │                   │                │
+└─────────┼───────────────┼───────────────────┼────────────────┘
+          │               │                   │
+          ▼               ▼                   ▼
+   ┌──────────┐   ┌──────────────┐   ┌──────────────┐
+   │ LLM API  │   │  MySQL 8.0   │   │  ChromaDB     │
+   │ DashScope│   │  (业务数据)   │   │  (向量存储)   │
+   │ DeepSeek │   └──────────────┘   └──────────────┘
+   │ Tavily   │
+   └──────────┘
+```
+
+- **前端** React + TypeScript + Vite，Ant Design 组件库，端口 5173
+- **后端** FastAPI 异步服务，端口 8080，SSE 流式推送 Agent 回复
+- **Agent** LangChain `create_agent()`，每个 Agent 独立 checkpointer 会话记忆
+- **数据库** MySQL 存业务数据 (用户/岗位/简历)，SQLite 存 Agent 会话和长期记忆
+- **向量库** ChromaDB 存文档分块向量，BM25 + 向量混合检索
+
 ## 为什么选择 Offer Pilot？
 
 传统求职平台只能**搜岗位和投简历**，Offer Pilot 在此基础上构建了一套完整的 AI 辅助体系：
@@ -142,55 +176,104 @@
 
 ### 环境要求
 
-- **Python** 3.10+
-- **MySQL** 8.0+
-- **Node.js** 18+ (前端)
-- [uv](https://docs.astral.sh/uv/) (推荐包管理器)
+| 软件 | 版本 | 用途 |
+|------|------|------|
+| Python | 3.10+ | 后端运行环境 |
+| MySQL | 8.0+ | 业务数据存储 |
+| Node.js | 18+ | 前端构建 |
+| [uv](https://docs.astral.sh/uv/) | 最新 | Python 包管理 (推荐) |
 
-### 后端
+### 获取 API Key
+
+部署前需要申请以下第三方服务：
+
+| 服务 | 用途 | 申请地址 | 免费额度 |
+|------|------|---------|---------|
+| **阿里百炼 DashScope** | LLM 大模型 | [dashscope.console.aliyun.com](https://dashscope.console.aliyun.com) | 100万 token/月 |
+| **Tavily Search** | 互联网搜索 | [tavily.com](https://tavily.com) | 1000 次/月 |
+| **DeepSeek** (备选) | 备选 LLM | [platform.deepseek.com](https://platform.deepseek.com) | 500万 token |
+
+> **推荐配置**: 主 LLM 用 DashScope (国内访问快)，备选 DeepSeek。免费额度足够个人使用。
+
+### 后端部署
 
 ```bash
+# 1. 克隆
 git clone https://github.com/M1kasa235/ai-resume.git
 cd ai-resume
 
-# 安装依赖
+# 2. 安装依赖
 uv sync
 # 或: pip install -r requirements.txt
 
-# 配置环境
+# 3. 配置环境变量
 cp .env.example .env
-# 编辑 .env，必填项:
-#   MYSQL_PASSWORD — 数据库密码
-#   SECRET_KEY — JWT 密钥
-#   DASHSCOPE_API_KEY — LLM API Key
-#   TAVILY_API_KEY — 搜索 API Key
+```
 
-# 创建数据库
+编辑 `.env`，至少填写以下 3 项：
+
+```env
+MYSQL_PASSWORD=你的数据库密码
+SECRET_KEY=随机字符串
+DASHSCOPE_API_KEY=sk-xxxxxxxxxxxxx
+TAVILY_API_KEY=tvly-xxxxxxxxxxxxx
+```
+
+```bash
+# 4. 创建 MySQL 数据库
 mysql -u root -p -e "CREATE DATABASE ai_job CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 
-# 数据库迁移
+# 5. 执行数据库迁移 (创建表结构)
 alembic upgrade head
 
-# 启动 (端口 8080)
+# 6. 启动后端 (端口 8080)
 python run.py
 ```
 
-### 前端
+### 验证后端
+
+```bash
+# 健康检查
+curl http://localhost:8080/health
+# → {"status":"ok","version":"1.0.0"}
+
+# 查看 API 文档
+open http://localhost:8080/docs
+```
+
+### 前端部署
 
 ```bash
 cd frontend
+
+# 安装依赖
 npm install
-npm run dev  # 端口 5173
+
+# 确认 API 地址 (默认指向 localhost:8080)
+cat .env.development
+# VITE_API_BASE_URL=http://localhost:8080
+
+# 启动开发服务器 (端口 5173)
+npm run dev
 ```
 
-### Docker
+访问 http://localhost:5173 → 注册账号 → 上传简历 → 开始使用 AI 求职顾问。
+
+### Docker 一键部署
 
 ```bash
 docker build -t offer-pilot .
-docker run -p 8080:8080 --env-file .env offer-pilot
+docker run -d \
+  --name offer-pilot \
+  -p 8080:8080 \
+  --env-file .env \
+  offer-pilot
+
+# 查看日志
+docker logs -f offer-pilot
 ```
 
-访问 http://localhost:8080/docs 查看 API 文档。
+> Docker 部署不含 MySQL，需要单独配置 MySQL 并在 `.env` 中指定 `MYSQL_HOST`。
 
 ## 项目结构
 
@@ -290,6 +373,72 @@ docker run -p 8080:8080 --env-file .env offer-pilot
 | `DEEPSEEK_API_KEY` | 否 | DeepSeek API Key (备选) |
 | `TAVILY_API_KEY` | **是** | Tavily 搜索 API Key |
 | `CORS_ORIGINS` | 否 | 允许的前端域名 |
+
+## API 速览
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/health` | GET | 健康检查 |
+| `/api/v1/auth/login` | POST | 用户登录 |
+| `/api/v1/auth/register` | POST | 用户注册 |
+| `/api/v1/jobs/` | GET | 岗位列表 (支持多维度搜索) |
+| `/api/v1/jobs/{id}` | GET | 岗位详情 |
+| `/api/v1/agent/chat/stream` | POST | **AI 对话入口** (SSE 流式) |
+| `/api/v1/agent/chat/history` | GET | 获取对话历史 |
+| `/api/v1/interview/start` | POST | 开始 AI 模拟面试 |
+| `/api/v1/interview/evaluate/{id}` | POST | 生成面试评估报告 |
+| `/api/v1/resume/diagnose` | POST | 简历诊断评分 |
+| `/api/v1/resume/match/{job_id}` | POST | 岗位匹配分析 |
+| `/api/v1/resume/optimize/{job_id}` | POST | 针对岗位优化简历 |
+| `/api/v1/memory/list` | GET | 查看长期记忆 |
+| `/api/v1/rag/search` | GET | 知识库搜索 |
+| `/api/v1/admin/*` | * | 管理后台 (知识库/简历管理) |
+
+## 常见问题
+
+### 启动报错 `SECRET_KEY must be set`
+
+`.env` 中的 `SECRET_KEY` 不能为空或使用默认值。生成方法：
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+### 启动报错 `MYSQL_PASSWORD cannot be empty`
+
+MySQL 密码未配置。确保 `.env` 中 `MYSQL_PASSWORD` 不为空。
+
+### `alembic upgrade head` 报连接失败
+
+检查 MySQL 是否运行，以及 `.env` 中 `MYSQL_HOST`/`MYSQL_PORT`/`MYSQL_USER`/`MYSQL_PASSWORD` 是否正确。
+
+### AI 对话无响应
+
+1. 检查 `DASHSCOPE_API_KEY` 是否配置正确
+2. 检查网络能否访问 `dashscope.aliyuncs.com`
+3. 查看终端日志: `[trace=xxx]` 开头的行包含完整调用链
+
+### 前端请求 404 / CORS 错误
+
+1. 确认后端已启动: `curl http://localhost:8080/health`
+2. 确认 `CORS_ORIGINS` 包含前端地址 `http://localhost:5173`
+
+### 记忆功能不生效
+
+记忆由 Memory Agent 自主判断写入，每 10 轮对话自动触发一次。你也可以手动触发：
+
+```bash
+curl -X POST http://localhost:8080/api/v1/memory/extract \
+  -H "Authorization: Bearer <your_token>"
+```
+
+### 数据库表未自动创建
+
+生产模式下建议使用 Alembic 迁移而非自动建表：
+
+```bash
+alembic upgrade head
+```
 
 ## 截图预留
 

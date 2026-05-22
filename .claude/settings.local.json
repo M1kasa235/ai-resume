@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git checkout *)",
+      "Bash(npx vite *)",
+      "Bash(pip install *)",
+      "Bash(python fix_jobmatch.py)",
+      "Bash(python _fix_imports.py)",
+      "Bash(python -c ' *)",
+      "Bash(python -c \"from app.api.v1 import chat; print\\(chat\\)\")",
+      "Bash(gh repo *)",
+      "Bash(gh api *)",
+      "Bash(find \"c:/Users/Administrator/Desktop/RAG-Agent\" -type f -name \"*.py\" -not -path \"*/.venv/*\" -not -path \"*/site-packages/*\" 2>/dev/null)",
+      "Read(//c/Users/Administrator/Desktop/RAG-Agent/**)",
+      "Bash(find \"c:/Users/Administrator/Desktop/RAG项目\" -type f -name \"*.py\" -not -path \"*/.venv/*\" -not -path \"*/site-packages/*\" 2>/dev/null)",
+      "Read(//c/Users/Administrator/Desktop/RAG项目/**)",
+      "Bash(ls \"c:/Users/Administrator/Desktop/agentic-rag-for-dummies/\" 2>&1)",
+      "Read(//c/Users/Administrator/Desktop/agentic-rag-for-dummies/**)",
+      "Bash(python -c \"from app.api.v1.admin import router; print\\('Router loaded OK'\\); print\\([r.path for r in router.routes]\\)\")",
+      "Bash(python -c \"from app.services.memory_service import MemoryService; print\\('import OK'\\)\")"
+    ]
+  }
+}
