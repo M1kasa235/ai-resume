@@ -155,7 +155,7 @@ async def stream_message(
         db.add(last_qa)
         await db.commit()
 
-    thread_id = f"user_{current_user.id}_interview_{session_id}"
+    thread_id = f"user_{current_user.id}_interview_{sid}"
 
     from app.agents.interview_agent import conduct_interview_stream, build_initial_prompt
 
@@ -196,19 +196,26 @@ async def stream_message(
                 full_response += token
                 yield f"data: {json.dumps({'type': 'token', 'content': token}, ensure_ascii=False)}\n\n"
 
-            # 流结束后写入新 QA
-            new_qa = AIInterviewQA(
-                interview_id=sid,
-                sequence=next_sequence,
-                question=full_response or "好的，我们继续下一题。",
-            )
-            db.add(new_qa)
-            interview.total_questions = next_sequence
-            await db.commit()
+            # 流结束后用独立会话写入，避免复用请求级 session 的生命周期竞态。
+            from app.db.session import AsyncSessionLocal
+
+            async with AsyncSessionLocal() as stream_db:
+                stream_interview = await stream_db.get(AIInterview, sid)
+                if not stream_interview:
+                    raise RuntimeError("面试会话不存在，无法保存流式结果")
+
+                new_qa = AIInterviewQA(
+                    interview_id=sid,
+                    sequence=next_sequence,
+                    question=full_response or "好的，我们继续下一题。",
+                )
+                stream_db.add(new_qa)
+                stream_interview.total_questions = next_sequence
+                await stream_db.commit()
 
             yield f"data: {json.dumps({'type': 'done', 'sequence': next_sequence})}\n\n"
         except Exception as e:
-            logger.error(f"流式生成失败: {e}")
+            logger.error(f"流式生成失败: {e}", exc_info=True)
             yield f"data: {json.dumps({'type': 'error', 'message': '生成失败，请重试'})}\n\n"
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")

@@ -9,6 +9,11 @@ _chat_model = None
 _structured_model = None
 
 
+def _resolve_base_url() -> str | None:
+    """优先使用显式配置的 base_url，避免把 API Key 当 URL。"""
+    return settings.DEEPSEEK_BASE_URL or settings.DASHSCOPE_BASE_URL or None
+
+
 def get_chat_model():
     """懒加载对话模型（temperature 0.7），适合聊天对话"""
     global _chat_model
@@ -17,7 +22,7 @@ def get_chat_model():
             model=_MODEL_NAME,
             model_provider="openai",
             temperature=0.7,
-            base_url=settings.DEEPSEEK_API_KEY,
+            base_url=_resolve_base_url(),
             api_key=settings.DEEPSEEK_API_KEY,
         )
     return _chat_model
@@ -31,7 +36,7 @@ def get_structured_model():
             model=_MODEL_NAME,
             model_provider="openai",
             temperature=0.3,
-            base_url=settings.DEEPSEEK_API_KEY,
+            base_url=_resolve_base_url(),
             api_key=settings.DEEPSEEK_API_KEY,
         )
     return _structured_model
