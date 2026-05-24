@@ -1,7 +1,7 @@
 # app/api/deps.py
 import logging
 from typing import Optional
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from jose import jwt, JWTError
@@ -9,6 +9,8 @@ from jose import jwt, JWTError
 from app.db.session import get_db
 from app.core.config import settings
 from app.core.security import decode_token
+from app.core.context import set_trace_id
+from app.core.request_context import RequestContext, set_request_context, new_trace_id
 from app.models.user import User
 from app.schemas.token import TokenPayload
 
@@ -83,3 +85,20 @@ async def get_current_admin_user(
             detail="权限不足，需要管理员权限"
         )
     return current_user
+
+
+async def inject_request_context(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+) -> RequestContext:
+    """注入统一 RequestContext（user_id / trace_id / route）。"""
+    header_trace = request.headers.get("X-Trace-Id", "").strip()
+    trace_id = set_trace_id(header_trace or new_trace_id())
+    ctx = RequestContext(
+        user_id=current_user.id,
+        trace_id=trace_id,
+        source="api",
+        route=str(request.url.path),
+    )
+    set_request_context(ctx)
+    return ctx

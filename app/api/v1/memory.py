@@ -3,10 +3,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, inject_request_context
 from app.models.user import User
 from app.core.llm import get_chat_model
-from app.core.context import set_current_user_id
+from app.core.request_context import RequestContext
 from app.agents.memory import MemoryService
 
 router = APIRouter(prefix="/memory", tags=["长期记忆"])
@@ -45,9 +45,9 @@ async def list_memories(current_user: User = Depends(get_current_user)):
 async def extract_memories(
     body: ExtractRequest,
     current_user: User = Depends(get_current_user),
+    _ctx: RequestContext = Depends(inject_request_context),
 ):
     """手动触发记忆提取（统一走事件队列）。"""
-    set_current_user_id(current_user.id)
     svc = MemoryService()
     llm = get_chat_model()
     event_id = await svc.enqueue_event(
@@ -125,9 +125,9 @@ async def retry_memory_event(
     event_id: str,
     body: RetryRequest,
     current_user: User = Depends(get_current_user),
+    _ctx: RequestContext = Depends(inject_request_context),
 ):
     """重试一条事件（支持立即处理）。"""
-    set_current_user_id(current_user.id)
     svc = MemoryService()
     event = await svc.retry_event(
         event_id=event_id,
@@ -149,9 +149,9 @@ async def retry_memory_event(
 async def retry_dead_letter_events(
     body: RetryDeadLetterRequest,
     current_user: User = Depends(get_current_user),
+    _ctx: RequestContext = Depends(inject_request_context),
 ):
     """批量重试当前用户 dead_letter 事件。"""
-    set_current_user_id(current_user.id)
     svc = MemoryService()
     requeued = await svc.retry_dead_letter_events(current_user.id, limit=body.limit)
 
@@ -172,9 +172,9 @@ async def process_pending_memory_events(
     batch_size: int = Query(default=20, ge=1, le=200),
     max_retries: int = Query(default=3, ge=1, le=20),
     current_user: User = Depends(get_current_user),
+    _ctx: RequestContext = Depends(inject_request_context),
 ):
     """手动触发一次 pending/failed 事件消费。"""
-    set_current_user_id(current_user.id)
     svc = MemoryService()
     llm = get_chat_model()
     processed = await svc.process_pending_events(
@@ -207,9 +207,9 @@ async def delete_memory(
 @router.post("/consolidate")
 async def consolidate_memories(
     current_user: User = Depends(get_current_user),
+    _ctx: RequestContext = Depends(inject_request_context),
 ):
     """手动触发记忆整合（合并同类项）"""
-    set_current_user_id(current_user.id)
     svc = MemoryService()
     llm = get_chat_model()
     await svc.consolidate(current_user.id, llm)

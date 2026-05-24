@@ -54,6 +54,15 @@ class Settings(BaseSettings):
     MEMORY_EVENT_WORKER_BATCH_SIZE: int = 20
     MEMORY_EVENT_MAX_RETRIES: int = 3
 
+    # 上下文注入预算
+    CONTEXT_USE_BUNDLE: bool = True
+    CONTEXT_TOTAL_MAX_CHARS: int = 3000
+    CONTEXT_SYSTEM_MAX_CHARS: int = 80
+    CONTEXT_MEMORY_MAX_CHARS: int = 520
+    CONTEXT_HISTORY_MAX_CHARS: int = 400
+    CONTEXT_USER_MAX_CHARS: int = 2000
+    CONTEXT_STRIP_API_DATE_PREFIX: bool = True
+
     @field_validator("SECRET_KEY")
     @classmethod
     def secret_key_must_be_set(cls, v: str) -> str:

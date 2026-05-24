@@ -6,7 +6,7 @@
 import time
 import logging
 
-from app.core.llm import get_chat_model
+from app.core.context import get_trace_id
 
 logger = logging.getLogger(__name__)
 
@@ -62,61 +62,26 @@ COMPRESSION_PROMPT = """把以下对话历史压缩为一段简洁摘要，保�
 COMPRESSION_THRESHOLD = 30
 
 
-# ── 对外接口 ──
+async def assemble_context(user_id: int, thread_id: str, message: str):
+    """Build structured ContextBundle for the current turn."""
+    from app.agents.context_assembler import assemble_context as _assemble
+
+    return await _assemble(user_id, thread_id, message)
+
 
 async def pre_process(user_id: int, thread_id: str, message: str) -> str:
-    """预处理用户消息，返回 enriched prompt"""
+    """预处理用户消息，返回 enriched prompt（兼容旧接口）。"""
     t0 = time.time()
-    parts: list[str] = []
-
-    # 1. 意图分类
-    intent = classify_intent(message)
-
-    # 2. 按意图定向检索记忆
-    if intent.get("needs_memory"):
-        try:
-            from app.agents.memory import MemoryService
-            svc = MemoryService()
-            result = await svc.retrieve_for_injection(
-                user_id=user_id,
-                query=message,
-                category_priority=intent.get("priority_categories", []),
-            )
-            ctx = result.get("text", "")
-            if ctx:
-                parts.append(ctx)
-        except Exception as e:
-            logger.warning(f"记忆检索失败: {e}")
-
-    # 3. 长对话时压缩历史
-    try:
-        from app.agents.config import create_checkpointer
-        cp = create_checkpointer()
-        checkpoint = cp.get({"configurable": {"thread_id": thread_id}})
-        if checkpoint and checkpoint.get("channel_values"):
-            messages = checkpoint["channel_values"].get("messages", [])
-            if len(messages) > COMPRESSION_THRESHOLD:
-                recent = [m.content for m in messages[-20:] if hasattr(m, "content") and m.content]
-                if recent:
-                    conversation = "\n".join(recent[-10:])
-                    model = get_chat_model()
-                    resp = await model.ainvoke(COMPRESSION_PROMPT.format(messages=conversation))
-                    summary = resp.content if hasattr(resp, "content") else str(resp)
-                    if summary.strip():
-                        parts.insert(0, f"[对话历史摘要] {summary.strip()}")
-    except Exception as e:
-        logger.warning(f"历史压缩失败: {e}")
-
-    # 4. 拼装
-    parts.append(message)
-    enriched = "\n\n".join(parts)
-
-    from app.core.context import get_trace_id
+    bundle = await assemble_context(user_id, thread_id, message)
+    enriched = bundle.render()
+    meta = bundle.to_log_dict()
     elapsed = int((time.time() - t0) * 1000)
-    mem_len = len(parts[0]) if intent.get("needs_memory") and len(parts) > 1 else 0
     logger.info(
-        f"[trace={get_trace_id()}] pre_process done {elapsed}ms "
-        f"intent={intent.get('category')} mem_len={mem_len}"
+        "[trace=%s] pre_process done %sms intent=%s blocks=%s truncated=%s",
+        get_trace_id(),
+        elapsed,
+        meta.get("intent"),
+        len(meta.get("blocks", [])),
+        meta.get("truncated"),
     )
-
     return enriched
