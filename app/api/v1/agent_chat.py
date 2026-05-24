@@ -21,6 +21,7 @@ class UnifiedChatRequest(BaseModel):
     message: str
     thread_id: str = "default"
     image_url: Optional[str] = None
+    web_search_enabled: bool = False
 
 
 @router.post("/agent/chat/stream")
@@ -31,9 +32,22 @@ async def unified_chat(
 ):
     """统一聊天入口，Supervisor 编排子 agent 处理"""
     isolated_thread_id = f"user_{current_user.id}_{request.thread_id}"
-    update_request_context(thread_id=isolated_thread_id)
+    update_request_context(
+        thread_id=isolated_thread_id,
+        web_search_enabled=request.web_search_enabled,
+    )
+    logger.info(
+        "chat stream user=%s thread=%s web_search=%s",
+        current_user.id,
+        isolated_thread_id,
+        request.web_search_enabled,
+    )
     return StreamingResponse(
-        supervisor_stream(request.message, isolated_thread_id),
+        supervisor_stream(
+            request.message,
+            isolated_thread_id,
+            web_search_enabled=request.web_search_enabled,
+        ),
         media_type="text/event-stream",
     )
 

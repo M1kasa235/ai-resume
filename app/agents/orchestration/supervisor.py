@@ -37,12 +37,35 @@ def get_supervisor():
     return AgentRegistry.get_or_create("supervisor", _build)
 
 
-async def supervisor_stream(prompt: str, thread_id: str):
+def _web_search_preference_block(enabled: bool) -> str:
+    if enabled:
+        return (
+            "[用户偏好：已开启联网搜索]\n"
+            "行业资讯、面试技巧、简历书写类问题可调用 search_industry_news、"
+            "search_interview_tips、search_resume_writing_tips。"
+        )
+    return (
+        "[用户偏好：已关闭联网搜索]\n"
+        "请勿调用互联网搜索工具；请使用 search_knowledge 与平台内岗位数据。"
+    )
+
+
+async def supervisor_stream(
+    prompt: str,
+    thread_id: str,
+    web_search_enabled: bool = False,
+):
     """流式调用 supervisor agent"""
-    update_request_context(thread_id=thread_id)
+    update_request_context(thread_id=thread_id, web_search_enabled=web_search_enabled)
     uid = require_current_user_id()
     tid = get_trace_id()
-    logger.info("[trace=%s] supervisor_stream start user=%s prompt=%s", tid, uid, prompt[:80])
+    logger.info(
+        "[trace=%s] supervisor_stream start user=%s web_search=%s prompt=%s",
+        tid,
+        uid,
+        web_search_enabled,
+        prompt[:80],
+    )
 
     try:
         bundle = await assemble_context(uid, thread_id, prompt)
@@ -52,6 +75,8 @@ async def supervisor_stream(prompt: str, thread_id: str):
         logger.warning("context assembly failed, falling back to memory-only", exc_info=True)
         memory_ctx = await MemoryService().format_context(uid, query=prompt)
         enriched = f"{memory_ctx}\n\n{prompt}" if memory_ctx else prompt
+
+    enriched = f"{_web_search_preference_block(web_search_enabled)}\n\n{enriched}"
 
     create_context_task(maybe_trigger_memory_agent(thread_id))
 

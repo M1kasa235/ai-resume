@@ -1,10 +1,16 @@
 """简历相关工具 — 包装 RAG 操作为 agent 可调用的工具"""
 
-import json
 import logging
 from langchain_core.tools import tool
 from app.rag import get_rag_service
 from app.core.context import require_current_user_id
+from app.agents.tools.resume_formatters import (
+    format_diagnosis_report,
+    format_match_report,
+    format_optimize_report,
+    format_polish_report,
+    format_query_report,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +29,7 @@ async def query_resume(question: str) -> str:
 - 要针对岗位改简历 → 用 optimize_for_job
 - 要看匹配度 → 用 match_resume_to_job"""
     result = await get_rag_service().query(require_current_user_id(), question)
-    return json.dumps(result, ensure_ascii=False)
+    return format_query_report(result)
 
 
 @tool
@@ -37,7 +43,7 @@ async def diagnose_resume() -> str:
 
 注意：本工具做的是简历本身质量的诊断，不涉及特定岗位的匹配度。"""
     result = await get_rag_service().diagnose(require_current_user_id())
-    return json.dumps(result, ensure_ascii=False)
+    return format_diagnosis_report(result)
 
 
 @tool
@@ -67,7 +73,7 @@ async def optimize_for_job(job_id: int) -> str:
         "requirements": job.requirements or "",
     }
     result = await get_rag_service().optimize_for_job(require_current_user_id(), job_info)
-    return json.dumps(result, ensure_ascii=False)
+    return format_optimize_report(result)
 
 
 @tool
@@ -92,7 +98,7 @@ async def match_resume_to_job(job_id: int) -> str:
             return "岗位不存在"
 
     result = await get_rag_service().match_job(require_current_user_id(), job)
-    return json.dumps(result, ensure_ascii=False)
+    return format_match_report(result)
 
 
 @tool
@@ -108,4 +114,4 @@ async def polish_section(section: str, content: str) -> str:
 - section: 段落类型，如 "项目经历"、"工作经历"、"自我评价"、"技能" 等
 - content: 需要润色的原文内容"""
     result = await get_rag_service().polish(section, content)
-    return json.dumps(result, ensure_ascii=False)
+    return format_polish_report(result)

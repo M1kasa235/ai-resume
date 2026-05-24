@@ -47,6 +47,8 @@ class Settings(BaseSettings):
 
     # 搜索引擎配置
     TAVILY_API_KEY: str = ""
+    TAVILY_WEB_SEARCH_ENABLED: bool = True
+    TAVILY_MAX_RESULTS: int = 5
 
     # 记忆事件后台处理
     MEMORY_EVENT_WORKER_ENABLED: bool = True

@@ -8,6 +8,7 @@ from app.agents.config import create_checkpointer, make_middleware
 from app.agents.registry import AgentRegistry
 from app.agents.tools.resume_tools import query_resume, diagnose_resume, optimize_for_job, match_resume_to_job, polish_section
 from app.agents.tools.job_tools import search_jobs, search_knowledge
+from app.agents.tools.web_tools import search_interview_tips, search_resume_writing_tips
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +28,10 @@ system_prompt = """
 3. **用户要求"针对XX岗位改简历/优化"** → 先用 search_jobs 找到岗位，再用 optimize_for_job
 4. **用户问简历中的具体事实（技能/项目/经历/教育）** → query_resume
 5. **用户要求"润色/改写/优化这段XX"** → polish_section（传入段落类型和原文）
-6. **用户问通用方法论（怎么写简历/面试技巧）** → search_knowledge(doc_type="resume_guide")
+6. **用户问通用方法论（怎么写简历/STAR法则/项目描述）** → 先 search_knowledge(doc_type="resume_guide")；若用户已开启联网搜索 → search_resume_writing_tips
+7. **用户问面试技巧/怎么准备面试** → 先 search_knowledge(doc_type="interview")；若用户已开启联网搜索 → search_interview_tips
+
+关键：遵守消息中的「用户偏好：已开启/关闭联网搜索」；关闭时不要调用互联网搜索工具。
 
 关键区分：
 - "我的简历有什么问题" → diagnose_resume（诊断评分），不是 query_resume
@@ -37,16 +41,17 @@ system_prompt = """
 
 ## 工具返回格式处理
 
-不同工具返回的 JSON 结构不同，你必须解析后重新组织为面向用户的中文回答：
+工具返回**已格式化的中文报告**（Markdown），请直接呈现或轻微润色，**禁止**输出 JSON 或工具原始字段。
 
-**query_resume** — 返回 `{"answer": "...", "references": [...]}`，基于 answer 字段呈现。
-**diagnose_resume** — 返回 `{"overall_score": "...", "strengths": [...], "weaknesses": [...], "suggestions": [...]}`，组织为「综合评分 → 优势 → 不足 → 改进建议」的结构化报告。
-**optimize_for_job** — 返回优化后的逐段对比和完整简历，按段落逐一展示改动。
-**match_resume_to_job** — 返回各维度匹配分和总体分析，用分维度展示。
-**polish_section** — 返回优化后的文本和改动说明，展示原文与优化版的对比。
+- **diagnose_resume** → 简历诊断报告（评分、优势、不足、建议）
+- **optimize_for_job** → 逐段优化与完整简历
+- **match_resume_to_job** → 各维度匹配分析
+- **polish_section** → 原文/优化对比
+- **query_resume** → 基于简历的事实回答
 
 ## 严格禁止
-- 禁止将工具返回的原始 JSON 直接输出给用户
+- 禁止输出 JSON、字典、列表等原始数据结构
+- 禁止重复「请稍等」等客套话；调用工具后直接呈现报告
 - 禁止生成假设的简历片段、示例简历或虚构信息
 - 禁止为工具返回的真实数据添加虚构信息（姓名、公司名、学历等）
 - 如果工具返回的内容不足以回答用户问题，直接告知用户，不要自行补充
@@ -64,7 +69,17 @@ def get_resume_agent():
         model = get_structured_model()
         return create_agent(
             model=model,
-            tools=[search_jobs, search_knowledge, query_resume, diagnose_resume, optimize_for_job, match_resume_to_job, polish_section],
+            tools=[
+                search_jobs,
+                search_knowledge,
+                search_resume_writing_tips,
+                search_interview_tips,
+                query_resume,
+                diagnose_resume,
+                optimize_for_job,
+                match_resume_to_job,
+                polish_section,
+            ],
             system_prompt=system_prompt,
             name="resume-assistant",
             checkpointer=create_checkpointer(),

@@ -2,7 +2,10 @@ PASSTHROUGH_START = "<!--PASSTHROUGH_START-->"
 PASSTHROUGH_END = "<!--PASSTHROUGH_END-->"
 SUB_AGENT_TIMEOUT = 45
 
-STRUCTURED_KEYWORDS = ["诊断", "优化", "匹配", "评分", "修改简历", "改简历", "润色"]
+STRUCTURED_KEYWORDS = [
+    "诊断", "优化", "匹配", "评分", "修改简历", "改简历", "润色",
+    "怎么样", "改进", "看看", "分析", "有什么问题", "有哪些不足",
+]
 
 
 def is_structured_query(query: str) -> bool:

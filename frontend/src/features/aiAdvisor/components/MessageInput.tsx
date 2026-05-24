@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
-import { Button, Input } from 'antd';
-import { SendOutlined } from '@ant-design/icons';
+import { Button, Input, Tooltip } from 'antd';
+import { GlobalOutlined, SendOutlined } from '@ant-design/icons';
 
 import styles from '../Advisor.module.scss';
 
@@ -9,9 +9,16 @@ const { TextArea } = Input;
 interface MessageInputProps {
   onSend: (content: string) => void;
   disabled?: boolean;
+  webSearchEnabled?: boolean;
+  onWebSearchChange?: (enabled: boolean) => void;
 }
 
-export default function MessageInput({ onSend, disabled }: MessageInputProps) {
+export default function MessageInput({
+  onSend,
+  disabled,
+  webSearchEnabled = false,
+  onWebSearchChange,
+}: MessageInputProps) {
   const [value, setValue] = useState('');
 
   const handleSend = useCallback(() => {
@@ -43,7 +50,21 @@ export default function MessageInput({ onSend, disabled }: MessageInputProps) {
         className={styles.textarea}
       />
       <div className={styles.inputActions}>
-        <span className={styles.inputHint}>Enter 发送 · Shift+Enter 换行</span>
+        <div className={styles.inputLeft}>
+          <Tooltip title="开启后可搜索行业资讯、面试技巧、简历写法（消耗 Tavily 配额）">
+            <Button
+              type={webSearchEnabled ? 'primary' : 'default'}
+              ghost={webSearchEnabled}
+              icon={<GlobalOutlined />}
+              onClick={() => onWebSearchChange?.(!webSearchEnabled)}
+              disabled={disabled}
+              className={styles.webSearchBtn}
+            >
+              联网搜索
+            </Button>
+          </Tooltip>
+          <span className={styles.inputHint}>Enter 发送 · Shift+Enter 换行</span>
+        </div>
         <Button
           type="primary"
           icon={<SendOutlined />}

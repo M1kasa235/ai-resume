@@ -19,6 +19,7 @@ class RequestContext:
     thread_id: str = ""
     source: str = "api"
     route: str = ""
+    web_search_enabled: bool = False
 
 
 def set_request_context(ctx: RequestContext) -> RequestContext:

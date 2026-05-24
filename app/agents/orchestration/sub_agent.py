@@ -15,6 +15,7 @@ from app.agents.orchestration.constants import (
     is_structured_query,
 )
 from app.agents.resume_agent import get_resume_agent
+from app.agents.tools.resume_formatters import strip_json_from_reply
 from app.agents.trace import AgentTrace
 from app.core.context import get_conversation_thread_id
 
@@ -38,8 +39,10 @@ async def invoke_sub_agent(role: str, query: str, uid: int) -> str:
                 timeout=SUB_AGENT_TIMEOUT,
             )
         reply = result["messages"][-1].content
-        if role == "resume" and is_structured_query(query):
-            reply = f"{PASSTHROUGH_START}\n{reply}\n{PASSTHROUGH_END}"
+        if role == "resume":
+            reply = strip_json_from_reply(reply)
+            if is_structured_query(query):
+                reply = f"{PASSTHROUGH_START}\n{reply}\n{PASSTHROUGH_END}"
         return reply
     except asyncio.TimeoutError:
         logger.error("%s_agent 超时 (%ss)", role, SUB_AGENT_TIMEOUT)

@@ -353,7 +353,12 @@ export const workbenchApi = {
 export const advisorApi = {
   // 流式对话（SSE）
   chatStream: async (
-    data: { message: string; image_url?: string; thread_id: string },
+    data: {
+      message: string;
+      image_url?: string;
+      thread_id: string;
+      web_search_enabled?: boolean;
+    },
     onChunk: (text: string) => void,
     onDone: () => void,
     onError: (err: Error) => void,

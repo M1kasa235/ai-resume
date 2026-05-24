@@ -57,3 +57,8 @@ def set_conversation_thread_id(thread_id: str):
 def get_conversation_thread_id() -> str:
     ctx = get_request_context()
     return ctx.thread_id if ctx else ""
+
+
+def is_web_search_enabled() -> bool:
+    ctx = get_request_context()
+    return bool(ctx and ctx.web_search_enabled)

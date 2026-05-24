@@ -25,6 +25,16 @@ function getStorageKey(): string {
   }
 }
 
+const WEB_SEARCH_STORAGE_KEY = 'advisor-web-search-enabled';
+
+function loadWebSearchEnabled(): boolean {
+  try {
+    return localStorage.getItem(WEB_SEARCH_STORAGE_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
@@ -61,6 +71,7 @@ export default function AIAdvisor() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
+  const [webSearchEnabled, setWebSearchEnabled] = useState(loadWebSearchEnabled);
   const streamingRef = useRef('');
 
   // 初始化：如果没有会话，自动创建一个
@@ -134,7 +145,12 @@ export default function AIAdvisor() {
       streamingRef.current = '';
 
       await advisorApi.chatStream(
-        { message: content, image_url: '', thread_id: activeThreadId },
+        {
+          message: content,
+          image_url: '',
+          thread_id: activeThreadId,
+          web_search_enabled: webSearchEnabled,
+        },
         (chunk) => {
           streamingRef.current += chunk;
           setStreamingContent(streamingRef.current);
@@ -155,8 +171,13 @@ export default function AIAdvisor() {
         },
       );
     },
-    [activeThreadId, sessions, updateSessionTitle],
+    [activeThreadId, sessions, updateSessionTitle, webSearchEnabled],
   );
+
+  const handleWebSearchChange = useCallback((enabled: boolean) => {
+    setWebSearchEnabled(enabled);
+    localStorage.setItem(WEB_SEARCH_STORAGE_KEY, String(enabled));
+  }, []);
 
   return (
     <div className={styles.advisor}>
@@ -169,7 +190,12 @@ export default function AIAdvisor() {
       />
       <div className={styles.main}>
         <ChatArea messages={messages} streaming={streaming} streamingContent={streamingContent} />
-        <MessageInput onSend={handleSend} disabled={!activeThreadId || streaming} />
+        <MessageInput
+          onSend={handleSend}
+          disabled={!activeThreadId || streaming}
+          webSearchEnabled={webSearchEnabled}
+          onWebSearchChange={handleWebSearchChange}
+        />
       </div>
     </div>
   );
