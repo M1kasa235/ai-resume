@@ -1,5 +1,6 @@
 # app/main.py
 from contextlib import asynccontextmanager
+import asyncio
 import logging
 
 from dotenv import load_dotenv
@@ -32,6 +33,8 @@ async def lifespan(app: FastAPI):
     启动时：创建数据库表（开发环境）
     关闭时：清理资源
     """
+    memory_worker_task: asyncio.Task | None = None
+
     # 启动事件
     try:
         async with engine.begin() as conn:
@@ -39,12 +42,47 @@ async def lifespan(app: FastAPI):
         if settings.DEBUG:
             print("数据库表已创建/确认")
 
-        # 长期记忆：建表 + 清理过期
+        # 长期记忆：建表 + 清理过期 + 事件后台处理
         try:
             from app.agents.memory import MemoryService
             ms = MemoryService()
             await ms._ensure_table()
             await ms.decay_all()
+            # 启动时先消费一轮积压事件，缩短恢复时间。
+            await ms.process_pending_events(
+                batch_size=settings.MEMORY_EVENT_WORKER_BATCH_SIZE,
+                max_retries=settings.MEMORY_EVENT_MAX_RETRIES,
+            )
+
+            if settings.MEMORY_EVENT_WORKER_ENABLED:
+                async def _memory_event_worker():
+                    """后台轮询 pending/failed 记忆事件。"""
+                    while True:
+                        try:
+                            processed = await ms.process_pending_events(
+                                batch_size=settings.MEMORY_EVENT_WORKER_BATCH_SIZE,
+                                max_retries=settings.MEMORY_EVENT_MAX_RETRIES,
+                            )
+                            if processed > 0:
+                                logger.info(
+                                    "memory event worker processed=%s batch=%s",
+                                    processed,
+                                    settings.MEMORY_EVENT_WORKER_BATCH_SIZE,
+                                )
+                        except asyncio.CancelledError:
+                            raise
+                        except Exception:
+                            logger.warning("memory event worker 执行失败", exc_info=True)
+
+                        await asyncio.sleep(
+                            max(1, settings.MEMORY_EVENT_WORKER_INTERVAL_SECONDS)
+                        )
+
+                memory_worker_task = asyncio.create_task(
+                    _memory_event_worker(),
+                    name="memory-event-worker",
+                )
+
             if settings.DEBUG:
                 print("长期记忆表已创建/确认，过期记忆已清理")
         except Exception as e:
@@ -62,6 +100,13 @@ async def lifespan(app: FastAPI):
     yield
 
     # 关闭事件
+    if memory_worker_task is not None:
+        memory_worker_task.cancel()
+        try:
+            await memory_worker_task
+        except asyncio.CancelledError:
+            pass
+
     await engine.dispose()
     print("数据库连接已释放")
 

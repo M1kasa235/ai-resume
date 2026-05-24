@@ -687,18 +687,127 @@ class MemoryService:
         )
         return dict(rows[0]) if rows else None
 
-    async def list_events(self, user_id: int, limit: int = 20) -> list[dict]:
+    async def list_events(
+        self,
+        user_id: int,
+        limit: int = 20,
+        offset: int = 0,
+        status: str | None = None,
+    ) -> list[dict]:
+        conn = await self._get_conn()
+        limit = max(1, min(200, int(limit)))
+        offset = max(0, int(offset))
+        if status:
+            rows = await conn.execute_fetchall(
+                """
+                SELECT * FROM memory_events
+                WHERE user_id=? AND status=?
+                ORDER BY created_at DESC
+                LIMIT ? OFFSET ?
+                """,
+                (user_id, status, limit, offset),
+            )
+        else:
+            rows = await conn.execute_fetchall(
+                """
+                SELECT * FROM memory_events
+                WHERE user_id=?
+                ORDER BY created_at DESC
+                LIMIT ? OFFSET ?
+                """,
+                (user_id, limit, offset),
+            )
+        return [dict(r) for r in rows]
+
+    async def get_event_stats(self, user_id: int) -> dict:
         conn = await self._get_conn()
         rows = await conn.execute_fetchall(
             """
-            SELECT * FROM memory_events
+            SELECT status, COUNT(*) AS cnt
+            FROM memory_events
             WHERE user_id=?
-            ORDER BY created_at DESC
+            GROUP BY status
+            """,
+            (user_id,),
+        )
+        by_status: dict[str, int] = {}
+        total = 0
+        for row in rows:
+            status = str(row["status"])
+            cnt = int(row["cnt"])
+            by_status[status] = cnt
+            total += cnt
+        return {
+            "total": total,
+            "by_status": by_status,
+            "pending_or_failed": by_status.get("pending", 0) + by_status.get("failed", 0),
+            "dead_letter": by_status.get("dead_letter", 0),
+        }
+
+    async def retry_event(
+        self,
+        event_id: str,
+        user_id: int | None = None,
+        reset_retry_count: bool = True,
+    ) -> dict | None:
+        event = await self.get_event(event_id)
+        if not event:
+            return None
+        if user_id is not None and int(event["user_id"]) != int(user_id):
+            return None
+        if event.get("status") == "processing":
+            return event
+
+        next_retry = 0 if reset_retry_count else int(event.get("retry_count") or 0)
+        conn = await self._get_conn()
+        async with self._write_lock:
+            await conn.execute(
+                """
+                UPDATE memory_events
+                SET status='pending',
+                    retry_count=?,
+                    last_error='',
+                    updated_at=datetime('now','localtime'),
+                    processed_at=NULL
+                WHERE id=?
+                """,
+                (next_retry, event_id),
+            )
+            await conn.commit()
+        return await self.get_event(event_id)
+
+    async def retry_dead_letter_events(self, user_id: int, limit: int = 20) -> int:
+        conn = await self._get_conn()
+        limit = max(1, min(200, int(limit)))
+        rows = await conn.execute_fetchall(
+            """
+            SELECT id FROM memory_events
+            WHERE user_id=? AND status='dead_letter'
+            ORDER BY created_at ASC
             LIMIT ?
             """,
-            (user_id, max(1, min(100, int(limit)))),
+            (user_id, limit),
         )
-        return [dict(r) for r in rows]
+        event_ids = [str(r["id"]) for r in rows]
+        if not event_ids:
+            return 0
+
+        placeholders = ",".join("?" for _ in event_ids)
+        async with self._write_lock:
+            await conn.execute(
+                f"""
+                UPDATE memory_events
+                SET status='pending',
+                    retry_count=0,
+                    last_error='',
+                    updated_at=datetime('now','localtime'),
+                    processed_at=NULL
+                WHERE id IN ({placeholders})
+                """,
+                event_ids,
+            )
+            await conn.commit()
+        return len(event_ids)
 
     async def _mark_event_status(
         self,
@@ -947,18 +1056,33 @@ class MemoryService:
         llm=None,
         batch_size: int = 20,
         max_retries: int = 3,
+        user_id: int | None = None,
     ) -> int:
         conn = await self._get_conn()
-        rows = await conn.execute_fetchall(
-            """
-            SELECT id FROM memory_events
-            WHERE status IN ('pending', 'failed')
-              AND retry_count < ?
-            ORDER BY created_at ASC
-            LIMIT ?
-            """,
-            (max_retries, max(1, min(100, batch_size))),
-        )
+        batch_size = max(1, min(200, batch_size))
+        if user_id is None:
+            rows = await conn.execute_fetchall(
+                """
+                SELECT id FROM memory_events
+                WHERE status IN ('pending', 'failed')
+                  AND retry_count < ?
+                ORDER BY created_at ASC
+                LIMIT ?
+                """,
+                (max_retries, batch_size),
+            )
+        else:
+            rows = await conn.execute_fetchall(
+                """
+                SELECT id FROM memory_events
+                WHERE user_id=?
+                  AND status IN ('pending', 'failed')
+                  AND retry_count < ?
+                ORDER BY created_at ASC
+                LIMIT ?
+                """,
+                (user_id, max_retries, batch_size),
+            )
         count = 0
         for row in rows:
             result = await self.process_event(row["id"], llm=llm, max_retries=max_retries)

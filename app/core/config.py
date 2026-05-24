@@ -48,6 +48,12 @@ class Settings(BaseSettings):
     # 搜索引擎配置
     TAVILY_API_KEY: str = ""
 
+    # 记忆事件后台处理
+    MEMORY_EVENT_WORKER_ENABLED: bool = True
+    MEMORY_EVENT_WORKER_INTERVAL_SECONDS: int = 20
+    MEMORY_EVENT_WORKER_BATCH_SIZE: int = 20
+    MEMORY_EVENT_MAX_RETRIES: int = 3
+
     @field_validator("SECRET_KEY")
     @classmethod
     def secret_key_must_be_set(cls, v: str) -> str:
