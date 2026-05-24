@@ -60,8 +60,9 @@ async def clear_history(
     update_request_context(thread_id=isolated_thread_id)
 
     from app.agents.config import create_checkpointer
-    from app.agents.memory_agent import run_memory_agent, set_memory_source
-    from app.agents.context_threads import list_related_threads
+    from app.agents.context.threads import list_related_threads
+    from app.agents.memory.ingest import run_memory_agent, set_memory_source
+    from app.agents.orchestration.triggers import reset_round_counters
 
     checkpoint = create_checkpointer().get({"configurable": {"thread_id": isolated_thread_id}})
     summary = ""
@@ -80,10 +81,7 @@ async def clear_history(
         except Exception:
             logger.debug("清理子线程失败: %s", tid, exc_info=True)
 
-    from app.agents.supervisor import _message_counter
-    _message_counter.pop(isolated_thread_id, None)
-    for tid in related_threads:
-        _message_counter.pop(tid, None)
+    reset_round_counters(isolated_thread_id, *related_threads)
 
     if summary:
         set_memory_source("thread_clear")
