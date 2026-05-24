@@ -1,11 +1,11 @@
 """Memory ingestion entrypoint: enqueue + process."""
 
-import asyncio
 import contextvars
 import logging
 
 from app.agents.memory import MemoryService
-from app.core.context import get_trace_id, get_current_user_id
+from app.core.async_tasks import create_context_task
+from app.core.context import get_trace_id, require_current_user_id
 from app.core.llm import get_chat_model
 
 logger = logging.getLogger(__name__)
@@ -26,11 +26,7 @@ async def run_memory_agent(
     sync_process: bool = True,
 ):
     """统一记忆入口：写入 memory_events 并处理。"""
-    uid = get_current_user_id()
-    if uid <= 0:
-        logger.warning("memory run skipped: missing current_user_id")
-        return None
-
+    uid = require_current_user_id()
     source = _memory_source.get()
     svc = MemoryService()
     event_id = await svc.enqueue_event(
@@ -61,7 +57,7 @@ async def run_memory_agent(
         )
         return result
 
-    asyncio.create_task(_process())
+    create_context_task(_process())
     logger.info(
         "[trace=%s] memory event queued: user=%s event=%s source=%s",
         trace_id,
