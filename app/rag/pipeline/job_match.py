@@ -91,6 +91,8 @@ class JobMatchService:
                 "reason": s.get("reason", ""),
             })
 
+        overall = max(0.0, min(1.0, overall))
+
         return {
             "overall_score": round(overall, 4),
             "scores": normalized_scores,

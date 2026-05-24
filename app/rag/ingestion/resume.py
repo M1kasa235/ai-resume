@@ -2,6 +2,7 @@
 
 import os
 import uuid
+import threading
 from datetime import datetime, timezone
 from typing import Optional
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -18,6 +19,18 @@ SECTION_KEYWORDS = {
     "education": ["教育背景", "教育经历", "学历", "教育"],
     "self_evaluation": ["自我评价", "个人评价", "关于我"],
 }
+
+_LOCK_GUARD = threading.Lock()
+_USER_INGEST_LOCKS: dict[int, threading.Lock] = {}
+
+
+def _get_user_ingest_lock(user_id: int) -> threading.Lock:
+    with _LOCK_GUARD:
+        lock = _USER_INGEST_LOCKS.get(user_id)
+        if lock is None:
+            lock = threading.Lock()
+            _USER_INGEST_LOCKS[user_id] = lock
+        return lock
 
 
 def detect_section(title: str) -> str:
@@ -99,13 +112,11 @@ def process_resume_text(text: str, user_id: int, source: str = "resume.txt") -> 
     if not text.strip():
         return {"chunks_count": 0, "status": "error", "message": "内容为空"}
 
-    # 1. 删除旧 chunks
-    vector_store.delete_user_chunks(user_id)
-
-    # 2. 分块
+    # 1. 分块
     chunks = smart_chunk(text)
+    ingest_version = str(uuid.uuid4())
 
-    # 3. 构建 Document 对象（过滤空内容，避免 DashScope embedding 报错）
+    # 2. 构建 Document 对象（过滤空内容，避免 DashScope embedding 报错）
     documents = []
     for i, (section, content) in enumerate(chunks):
         if not content or not content.strip():
@@ -120,18 +131,28 @@ def process_resume_text(text: str, user_id: int, source: str = "resume.txt") -> 
                 "chunk_index": i,
                 "total_chunks": len(chunks),
                 "source": source,
+                "ingest_version": ingest_version,
                 "created_at": datetime.now(timezone.utc).isoformat(),
             }
         )
         documents.append(doc)
 
-    # 4. 入库
-    vector_store.add_documents(documents)
+    if not documents:
+        return {"chunks_count": 0, "status": "error", "message": "内容为空"}
+
+    # 3. 原子替换：先写新版本，成功后再删旧版本；失败时保留旧数据。
+    user_lock = _get_user_ingest_lock(user_id)
+    with user_lock:
+        old_ids = vector_store.list_ids_by_filter({"user_id": user_id})
+        vector_store.add_documents(documents)
+        if old_ids:
+            vector_store.delete_ids(old_ids)
 
     return {
         "chunks_count": len(documents),
         "status": "success",
         "sections": list(set(s for s, _ in chunks)),
+        "ingest_version": ingest_version,
     }
 
 

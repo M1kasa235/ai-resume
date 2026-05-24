@@ -1,5 +1,6 @@
 """简历 RAG 服务 — 统一封装检索→重排序→生成 pipeline（简化版：纯向量+Reranker）"""
 
+import asyncio
 import logging
 import time
 
@@ -53,14 +54,16 @@ class ResumeRAGService:
         sections = _detect_sections(question or query)
 
         if not sections:
-            return self.store.similarity_search(query, k=k, filter={"user_id": user_id})
+            return await asyncio.to_thread(
+                self.store.similarity_search, query, k, {"user_id": user_id}
+            )
 
         # 逐 section 搜索并去重
         seen: set[str] = set()
         docs: list[Document] = []
         for section in sections:
-            section_docs = self.store.similarity_search(
-                query, k=k, filter={"user_id": user_id, "section": section},
+            section_docs = await asyncio.to_thread(
+                self.store.similarity_search, query, k, {"user_id": user_id, "section": section}
             )
             for d in section_docs:
                 cid = d.metadata.get("chunk_id")
@@ -70,8 +73,8 @@ class ResumeRAGService:
 
         # 不足时全库补齐
         if len(docs) < k:
-            others = self.store.similarity_search(
-                query, k=k * 2, filter={"user_id": user_id},
+            others = await asyncio.to_thread(
+                self.store.similarity_search, query, k * 2, {"user_id": user_id}
             )
             for d in others:
                 cid = d.metadata.get("chunk_id")

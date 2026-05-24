@@ -15,8 +15,8 @@ class DashScopeReranker:
     gte-rerank-v2 单文档上限 4000 tokens，中文约 4000 字符。
     """
 
-    def __init__(self, model: str = "gte-rerank-v2", max_chars: int = 4000):
-        self.model = model
+    def __init__(self, model: str | None = None, max_chars: int = 4000):
+        self.model = model or settings.RAG_RERANK_MODEL
         self.api_key = settings.DASHSCOPE_API_KEY
         self.max_chars = max_chars
 

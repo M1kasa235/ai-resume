@@ -42,6 +42,8 @@ class Settings(BaseSettings):
     DASHSCOPE_API_KEY: str = ""
     DEEPSEEK_API_KEY: str = ""
     DEEPSEEK_BASE_URL: str = ""
+    RAG_EMBEDDING_MODEL: str = "text-embedding-v4"
+    RAG_RERANK_MODEL: str = "gte-rerank-v2"
 
     # 搜索引擎配置
     TAVILY_API_KEY: str = ""

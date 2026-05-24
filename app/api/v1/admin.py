@@ -149,6 +149,9 @@ async def import_jobs(
         result = KnowledgeIngestion().import_file(tmp_path, doc_type=doc_type, clear_existing=False)
         if result.get("status") == "error":
             raise HTTPException(status_code=400, detail=result["message"])
+        imported_doc_type = result.get("doc_type")
+        if imported_doc_type:
+            get_knowledge_service().invalidate_partition(imported_doc_type)
         return result
     finally:
         os.unlink(tmp_path)
@@ -167,6 +170,7 @@ async def clear_knowledge_partition(
     result = KnowledgeIngestion().clear_type(doc_type)
     if result["status"] == "error":
         raise HTTPException(status_code=500, detail=result["message"])
+    get_knowledge_service().invalidate_partition(doc_type)
     return result
 
 
@@ -188,6 +192,8 @@ async def reimport_knowledge_partition(
     result = KnowledgeIngestion().import_from_json(file_path, clear_existing=True)
     if result["status"] == "error":
         raise HTTPException(status_code=500, detail=result["message"])
+    imported_doc_type = result.get("doc_type", doc_type)
+    get_knowledge_service().invalidate_partition(imported_doc_type)
     return result
 
 
@@ -223,6 +229,9 @@ async def rebuild_all_knowledge(
         if jf.endswith(".json") and not jf.startswith("gen_"):
             jpath = os.path.join(knowledge_dir, jf)
             r = ingestion.import_file(jpath, clear_existing=True)
+            imported_doc_type = r.get("doc_type")
+            if imported_doc_type and r.get("status") != "error":
+                get_knowledge_service().invalidate_partition(imported_doc_type)
             results.append(r)
 
     return {"results": results}

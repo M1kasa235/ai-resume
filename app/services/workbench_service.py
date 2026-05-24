@@ -72,10 +72,14 @@ class WorkbenchService:
                 print(f"RAG 入库失败: {result.get('message')}")
                 raise HTTPException(status_code=500, detail=f"简历解析失败: {result.get('message')}")
         except HTTPException:
+            if os.path.exists(file_path):
+                os.remove(file_path)
             raise
         except Exception as e:
             import traceback
             traceback.print_exc()
+            if os.path.exists(file_path):
+                os.remove(file_path)
             raise HTTPException(status_code=500, detail=f"简历入库失败: {str(e)}")
 
         # 5. 更新数据库中的简历路径
@@ -85,7 +89,7 @@ class WorkbenchService:
         user = result.scalar_one_or_none()
 
         if user:
-            user.resume_url = resume_url
+            user.avatar_url = resume_url  # 暂时复用 avatar_url 字段存储简历路径
             await self.db.commit()
             await self.db.refresh(user)
 
@@ -101,7 +105,7 @@ class WorkbenchService:
             raise HTTPException(status_code=404, detail="用户不存在")
             
         return ResumeInfo(
-            resume_url=user.resume_url or user.avatar_url,
+            resume_url=user.avatar_url,
             real_name=user.real_name,
             phone=user.phone,
             email=user.email,

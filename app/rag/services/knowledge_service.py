@@ -74,15 +74,24 @@ class KnowledgeService:
         # 批量拉取 parent chunks
         parent_docs = self._fetch_parents_batch(parent_ids)
 
-        results = self._docs_to_results(ranked) if not parent_docs else [
-            {
-                "title": d.get("metadata", {}).get("title", ""),
-                "category": d.get("metadata", {}).get("category", ""),
-                "content": d.get("content", "").strip(),
-                "parent_id": d.get("parent_id", ""),
-            }
-            for d in parent_docs
-        ]
+        if not parent_docs:
+            results = self._docs_to_results(ranked)
+        else:
+            parent_map: dict[str, dict] = {}
+            for d in parent_docs:
+                pid = d.get("parent_id", "")
+                if pid and pid not in parent_map:
+                    parent_map[pid] = d
+            ordered_parent_docs = [parent_map[pid] for pid in parent_ids if pid in parent_map]
+            results = [
+                {
+                    "title": d.get("metadata", {}).get("title", ""),
+                    "category": d.get("metadata", {}).get("category", ""),
+                    "content": d.get("content", "").strip(),
+                    "parent_id": d.get("parent_id", ""),
+                }
+                for d in ordered_parent_docs
+            ] or self._docs_to_results(ranked)
         logger.info(
             f"knowledge_search: total={int((time.time()-t0)*1000)}ms "
             f"hybrid={int((t1-t0)*1000)}ms rerank={int((t2-t1)*1000)}ms "

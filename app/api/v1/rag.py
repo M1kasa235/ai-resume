@@ -31,11 +31,13 @@ async def query_resume(
     try:
         result = await get_rag_service().query(current_user.id, request.question)
         return ResumeQueryResponse(**result)
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"RAG 问答失败: {e}")
-        return ResumeQueryResponse(
-            answer="抱歉，回答生成失败，请稍后重试。",
-            references=[],
+        logger.error(f"RAG 问答失败: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=502,
+            detail="RAG 问答服务暂时不可用，请稍后重试。",
         )
 
 
@@ -63,10 +65,8 @@ async def match_job(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"岗位匹配失败: {e}")
-        return JobMatchResponse(
-            overall_score=0,
-            scores=[],
-            analysis="匹配分析失败，请稍后重试。",
-            suggestions=[],
+        logger.error(f"岗位匹配失败: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=502,
+            detail="岗位匹配服务暂时不可用，请稍后重试。",
         )

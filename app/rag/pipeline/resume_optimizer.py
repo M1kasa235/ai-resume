@@ -1,5 +1,6 @@
 """简历优化引擎：诊断、定向优化、润色（简化版：纯向量+Reranker 替代 RAGRetriever）"""
 
+import asyncio
 import logging
 
 from langchain_core.language_models import BaseChatModel
@@ -20,7 +21,9 @@ class ResumeDiagnoser:
     async def diagnose(self, user_id: int) -> dict:
         """分析简历整体优劣势"""
         query = "简历整体诊断分析 技能 经验 项目 教育 优势 不足"
-        docs = self.store.similarity_search(query, k=15, filter={"user_id": user_id})
+        docs = await asyncio.to_thread(
+            self.store.similarity_search, query, 15, {"user_id": user_id}
+        )
         if not docs:
             return {"error": "请先上传简历"}
 
@@ -66,7 +69,9 @@ class ResumeOptimizer:
     async def optimize_for_job(self, user_id: int, job_info: dict) -> dict:
         """针对目标岗位优化简历"""
         query = f"{job_info.get('title', '')} {job_info.get('description', '')[:200]}"
-        docs = self.store.similarity_search(query, k=15, filter={"user_id": user_id})
+        docs = await asyncio.to_thread(
+            self.store.similarity_search, query, 15, {"user_id": user_id}
+        )
         if not docs:
             return {"error": "请先上传简历"}
 

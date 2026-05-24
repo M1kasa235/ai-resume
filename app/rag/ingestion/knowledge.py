@@ -107,13 +107,14 @@ class KnowledgeIngestion:
         """逐条分块入库，JSON/CSV 共用"""
         if clear_existing:
             try:
-                self.vector_store.delete_by_filter({"doc_type": doc_type})
+                self.vector_store.delete_by_filter({"doc_type": doc_type, "source_file": source_file})
             except Exception:
                 logger.warning("清理旧分区失败 (doc_type=%s)，继续导入", doc_type, exc_info=True)
 
         parent_count = 0
         child_count = 0
         skipped = 0
+        failed = 0
         for record in records:
             title = record.get("title", "")
             category = record.get("category", "")
@@ -138,22 +139,36 @@ class KnowledgeIngestion:
             }
 
             parent_docs, child_docs = self.chunker.chunk(content, parent_metadata)
+            doc_group_id = parent_docs[0].metadata.get("doc_group_id") if parent_docs else None
+            parent_ids: list[str] = []
             try:
-                self.vector_store.add_documents(parent_docs)
-                parent_count += len(parent_docs)
+                parent_ids = self.vector_store.add_documents(parent_docs)
             except Exception:
                 logger.error("写入 parent chunk 失败 (title=%s, doc_type=%s)", title, doc_type, exc_info=True)
+                failed += 1
                 continue
 
             if child_docs:
                 try:
                     self.vector_store.add_documents(child_docs)
-                    child_count += len(child_docs)
                 except Exception:
                     logger.error("写入 child chunks 失败 (title=%s, doc_type=%s, count=%d)", title, doc_type, len(child_docs), exc_info=True)
+                    failed += 1
+                    # child 写入失败则回滚 parent，避免孤儿 parent。
+                    try:
+                        if doc_group_id:
+                            self.vector_store.delete_by_filter({"doc_group_id": doc_group_id})
+                        elif parent_ids:
+                            self.vector_store.delete_ids(parent_ids)
+                    except Exception:
+                        logger.warning("回滚 parent 失败 (title=%s, doc_type=%s)", title, doc_type, exc_info=True)
+                    continue
+
+            parent_count += len(parent_docs)
+            child_count += len(child_docs)
 
         result = {
-            "status": "success",
+            "status": "partial_success" if failed else "success",
             "doc_type": doc_type,
             "source_file": source_file,
             "records": len(records),
@@ -162,6 +177,8 @@ class KnowledgeIngestion:
         }
         if skipped:
             result["skipped"] = skipped
+        if failed:
+            result["failed"] = failed
         return result
 
     # ── 结构化格式 ──
@@ -250,7 +267,7 @@ class KnowledgeIngestion:
 
         if clear_existing:
             try:
-                self.vector_store.delete_by_filter({"doc_type": doc_type})
+                self.vector_store.delete_by_filter({"doc_type": doc_type, "source_file": path.name})
             except Exception:
                 logger.warning("清理旧分区失败 (doc_type=%s)，继续导入", doc_type, exc_info=True)
 
@@ -266,12 +283,20 @@ class KnowledgeIngestion:
 
         try:
             parent_docs, child_docs = self.chunker.chunk(text, metadata)
-            self.vector_store.add_documents(parent_docs)
+            doc_group_id = parent_docs[0].metadata.get("doc_group_id") if parent_docs else None
+            parent_ids = self.vector_store.add_documents(parent_docs)
             parent_count = len(parent_docs)
             child_count = 0
             if child_docs:
-                self.vector_store.add_documents(child_docs)
-                child_count = len(child_docs)
+                try:
+                    self.vector_store.add_documents(child_docs)
+                    child_count = len(child_docs)
+                except Exception as e:
+                    if doc_group_id:
+                        self.vector_store.delete_by_filter({"doc_group_id": doc_group_id})
+                    elif parent_ids:
+                        self.vector_store.delete_ids(parent_ids)
+                    return {"status": "error", "message": f"写入子分块失败并已回滚: {e}"}
         except Exception as e:
             return {"status": "error", "message": f"入库失败: {e}"}
 

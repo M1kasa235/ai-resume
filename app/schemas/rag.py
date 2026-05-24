@@ -24,7 +24,7 @@ class JobMatchRequest(BaseModel):
 
 class MatchScore(BaseModel):
     dimension: str
-    score: int  # 1-10
+    score: float  # 0-1
     reason: str
 
 

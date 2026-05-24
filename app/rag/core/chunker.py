@@ -68,20 +68,24 @@ class KnowledgeChunker:
                 child_docs = self.child_splitter.split_documents(
                     [Document(page_content=section_text)]
                 )
-                child_docs = [
-                    cd for cd in child_docs
-                    if cd.page_content and cd.page_content.strip()
-                ]
-                for ci, cd in enumerate(child_docs):
-                    cd.metadata = {
-                        **section_meta,
-                        "chunk_type": "child",
-                        "chunk_id": str(uuid.uuid4()),
-                        "parent_id": parent_id,
-                        "doc_group_id": doc_group_id,
-                        "child_index": ci,
-                    }
-                all_children.extend(child_docs)
+            else:
+                # 短文本也生成一个 child，避免仅有 parent 导致默认检索漏召回。
+                child_docs = [Document(page_content=section_text)]
+
+            child_docs = [
+                cd for cd in child_docs
+                if cd.page_content and cd.page_content.strip()
+            ]
+            for ci, cd in enumerate(child_docs):
+                cd.metadata = {
+                    **section_meta,
+                    "chunk_type": "child",
+                    "chunk_id": str(uuid.uuid4()),
+                    "parent_id": parent_id,
+                    "doc_group_id": doc_group_id,
+                    "child_index": ci,
+                }
+            all_children.extend(child_docs)
 
         return all_parents, all_children
 
