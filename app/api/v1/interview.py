@@ -11,8 +11,9 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import select, desc, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user, get_db
-from app.core.context import set_current_user_id
+from app.api.deps import get_current_user, get_db, inject_request_context
+from app.core.async_tasks import create_background_task
+from app.core.request_context import RequestContext
 from app.models.interview import AIInterview, AIInterviewQA
 from app.models.user import User
 from app.schemas.interview import (
@@ -119,9 +120,9 @@ async def start_interview(
     request: AIInterviewStartRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    _ctx: RequestContext = Depends(inject_request_context),
 ):
     """创建新的 AI 面试会话，即时返回。首问由 /stream 端点流式生成。"""
-    set_current_user_id(current_user.id)
 
     interview_type = request.interview_type or "comprehensive"
     if interview_type not in ("technical", "hr", "comprehensive"):
@@ -159,9 +160,9 @@ async def stream_message(
     request: AIInterviewReplyRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    _ctx: RequestContext = Depends(inject_request_context),
 ):
     """SSE 流式端点：发送用户回答，流式返回 AI 追问。首次调用生成开场白。"""
-    set_current_user_id(current_user.id)
 
     try:
         sid = int(session_id)
@@ -242,9 +243,9 @@ async def send_message(
     request: AIInterviewReplyRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    _ctx: RequestContext = Depends(inject_request_context),
 ):
     """发送用户回答，获取 AI 面试官追问（非流式，留作兜底）。达到 25 题上限时自动结束。"""
-    set_current_user_id(current_user.id)
 
     try:
         session_id_int = int(request.session_id)
@@ -324,9 +325,9 @@ async def get_session(
     session_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    _ctx: RequestContext = Depends(inject_request_context),
 ):
     """获取面试会话详情和历史消息"""
-    set_current_user_id(current_user.id)
 
     try:
         sid = int(session_id)
@@ -493,7 +494,12 @@ async def recover_stuck_evaluations():
 
         for i, iv in enumerate(recoverable):
             thread_id = f"user_{iv.user_id}_interview_{iv.id}"
-            asyncio.create_task(_run_evaluation_background(iv.id, iv.user_id, thread_id))
+            create_background_task(
+                _run_evaluation_background(iv.id, iv.user_id, thread_id),
+                user_id=iv.user_id,
+                thread_id=thread_id,
+                source="interview_recovery",
+            )
             if i < len(recoverable) - 1:
                 await asyncio.sleep(2)  # 错开 LLM 调用，避免并发风暴
 
@@ -503,9 +509,9 @@ async def end_session(
     session_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    _ctx: RequestContext = Depends(inject_request_context),
 ):
     """结束面试，后台异步生成评估报告，即时返回"""
-    set_current_user_id(current_user.id)
 
     try:
         sid = int(session_id)
@@ -539,7 +545,12 @@ async def end_session(
 
     thread_id = f"user_{current_user.id}_interview_{sid}"
 
-    asyncio.create_task(_run_evaluation_background(sid, current_user.id, thread_id))
+    create_background_task(
+        _run_evaluation_background(sid, current_user.id, thread_id),
+        user_id=current_user.id,
+        thread_id=thread_id,
+        source="interview_eval",
+    )
 
     return {
         "session_id": session_id,
@@ -553,9 +564,9 @@ async def get_report(
     session_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    _ctx: RequestContext = Depends(inject_request_context),
 ):
     """获取面试评估报告"""
-    set_current_user_id(current_user.id)
 
     try:
         sid = int(session_id)
@@ -615,9 +626,9 @@ async def list_reports(
     size: int = Query(10, ge=1, le=50),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    _ctx: RequestContext = Depends(inject_request_context),
 ):
     """获取用户的历史面试报告列表（含评估中的会话）"""
-    set_current_user_id(current_user.id)
 
     status_filter = or_(
         AIInterview.status == "completed",

@@ -12,9 +12,11 @@ from app.core.llm import get_chat_model
 from app.core.context import (
     get_trace_id,
     require_current_user_id,
-    set_conversation_thread_id,
+    update_request_context,
     get_conversation_thread_id,
 )
+from app.core.async_tasks import create_context_task
+from app.agents.context_threads import build_sub_agent_thread
 from app.agents.config import create_checkpointer, make_middleware
 from app.agents.agent import get_career_agent
 from app.agents.resume_agent import get_resume_agent
@@ -70,9 +72,7 @@ async def _invoke_agent(role: str, query: str, uid: int) -> str:
     """调用单个子 agent，返回回复文本。超时返回友好提示。"""
     agent = get_resume_agent() if role == "resume" else get_career_agent()
     parent_thread_id = get_conversation_thread_id()
-    thread_id = (
-        f"{parent_thread_id}:{role}" if parent_thread_id else f"user_{uid}_{role}"
-    )
+    thread_id = build_sub_agent_thread(parent_thread_id, role, uid)
     today = date.today().isoformat()
     contextualized = f"[系统上下文：今天是 {today}]\n\n{query}"
     try:
@@ -175,7 +175,14 @@ async def memory_agent_tool(query: str) -> str:
     uid = require_current_user_id()
     thread_id = f"user_{uid}_memory"
     set_memory_source("explicit")
-    asyncio.create_task(run_memory_agent(query, thread_id))
+    create_context_task(
+        run_memory_agent(
+            query,
+            thread_id=thread_id,
+            event_type="explicit_command",
+            sync_process=False,
+        )
+    )
     return "好的，我来整理一下记忆。"
 
 
@@ -207,8 +214,13 @@ async def _maybe_trigger_memory_agent(thread_id: str):
             if summary:
                 from app.agents.memory_agent import set_memory_source
                 set_memory_source("auto")
-                asyncio.create_task(
-                    run_memory_agent(summary, f"{thread_id}_auto")
+                create_context_task(
+                    run_memory_agent(
+                        summary,
+                        thread_id=f"{thread_id}_auto",
+                        event_type="auto_summary",
+                        sync_process=False,
+                    )
                 )
         except Exception:
             pass  # 静默失败
@@ -289,24 +301,28 @@ def get_supervisor():
 async def supervisor_stream(prompt: str, thread_id: str):
     """流式调用 supervisor agent"""
     from langchain_core.messages import AIMessageChunk
-    set_conversation_thread_id(thread_id)
+    update_request_context(thread_id=thread_id)
     uid = require_current_user_id()
     tid = get_trace_id()
     logger.info(f"[trace={tid}] supervisor_stream start user={uid} prompt={prompt[:80]}")
 
-    # Pre-process: 意图分类 + 记忆检索 + 历史压缩（StateGraph）
     try:
-        from app.agents.pre_process import pre_process
-        enriched = await pre_process(uid, thread_id, prompt)
+        from app.agents.pre_process import assemble_context
+        bundle = await assemble_context(uid, thread_id, prompt)
+        enriched = bundle.render()
+        logger.info(
+            "[trace=%s] context_bundle %s",
+            tid,
+            bundle.to_log_dict(),
+        )
     except Exception:
-        # 降级：走旧注入路径
         memory_ctx = await _get_memory_context(uid, query=prompt)
         if memory_ctx:
             enriched = memory_ctx + "\n\n" + prompt
         else:
             enriched = prompt
 
-    asyncio.create_task(_maybe_trigger_memory_agent(thread_id))
+    create_context_task(_maybe_trigger_memory_agent(thread_id))
 
     message = HumanMessage(content=enriched)
     try:
