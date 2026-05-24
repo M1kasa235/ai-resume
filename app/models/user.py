@@ -20,6 +20,7 @@ class User(Base):
 
     # 基础信息
     avatar_url: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, comment="头像URL")
+    resume_url: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, comment="简历URL")
     real_name: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, comment="真实姓名")
     gender: Mapped[Optional[str]] = mapped_column(String(10), nullable=True, comment="性别")
 

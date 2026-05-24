@@ -1,7 +1,7 @@
 """求职顾问 Agent — 岗位搜索、薪资分析、个性化推荐"""
 
 import logging
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, HumanMessage
 from langchain.agents import create_agent
 from langchain_tavily import TavilySearch
 
@@ -78,7 +78,7 @@ def get_career_agent():
 def get_chat_history(thread_id: str) -> list[dict[str, str]]:
     """获取会话历史"""
     logger.info(f"获取历史消息，thread_id: {thread_id}")
-    checkpoint = _ensure_checkpointer().get({"configurable": {"thread_id": thread_id}})
+    checkpoint = create_checkpointer().get({"configurable": {"thread_id": thread_id}})
     if not checkpoint:
         return []
     channel_values = checkpoint.get("channel_values")
@@ -101,4 +101,4 @@ def get_chat_history(thread_id: str) -> list[dict[str, str]]:
 def clear_chat_history(thread_id: str):
     """清空会话"""
     logger.info(f"清空历史消息，thread_id: {thread_id}")
-    _ensure_checkpointer().delete_thread(thread_id)
+    create_checkpointer().delete_thread(thread_id)

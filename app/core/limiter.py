@@ -45,7 +45,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     """限流中间件"""
     
     async def dispatch(self, request: Request, call_next):
-        client_ip = request.client.host
+        client_ip = request.client.host if request.client else "unknown"
         path = request.url.path
         
         # 针对不同路径设置不同限流

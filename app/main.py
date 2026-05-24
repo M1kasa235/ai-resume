@@ -79,8 +79,8 @@ def create_application() -> FastAPI:
     )
     
 
-    # 添加限流中间件（临时禁用以排查问题）
-    # app.add_middleware(RateLimitMiddleware)
+    # 添加限流中间件
+    app.add_middleware(RateLimitMiddleware)
 
     # CORS 配置（从环境变量读取，生产环境应限制具体域名）
     app.add_middleware(

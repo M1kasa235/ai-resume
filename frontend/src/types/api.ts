@@ -26,6 +26,7 @@ export interface User {
   email: string;
   phone?: string;
   avatar_url?: string;
+  resume_url?: string;
   real_name?: string;
   gender?: string;
   current_city?: string;

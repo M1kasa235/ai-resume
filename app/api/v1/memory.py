@@ -9,7 +9,7 @@ from app.core.llm import get_chat_model
 from app.core.context import set_current_user_id
 from app.agents.memory import MemoryService
 
-router = APIRouter()
+router = APIRouter(prefix="/memory", tags=["长期记忆"])
 
 
 class ExtractRequest(BaseModel):

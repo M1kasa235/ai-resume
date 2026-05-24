@@ -85,7 +85,7 @@ class WorkbenchService:
         user = result.scalar_one_or_none()
 
         if user:
-            user.avatar_url = resume_url  # 暂时复用 avatar_url 字段存储简历路径
+            user.resume_url = resume_url
             await self.db.commit()
             await self.db.refresh(user)
 
@@ -101,7 +101,7 @@ class WorkbenchService:
             raise HTTPException(status_code=404, detail="用户不存在")
             
         return ResumeInfo(
-            resume_url=user.avatar_url,
+            resume_url=user.resume_url or user.avatar_url,
             real_name=user.real_name,
             phone=user.phone,
             email=user.email,

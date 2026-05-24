@@ -58,6 +58,7 @@ class UserResponse(UserBase):
 
     id: int
     avatar_url: Optional[str] = None
+    resume_url: Optional[str] = None
     real_name: Optional[str] = None
     gender: Optional[str] = None
     current_city: Optional[str] = None

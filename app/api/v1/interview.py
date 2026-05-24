@@ -486,7 +486,13 @@ async def end_session(
         raise HTTPException(status_code=404, detail="面试会话不存在")
     if interview.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="无权访问该会话")
-    if interview.status not in ("ongoing", "evaluating"):
+    if interview.status == "evaluating":
+        return {
+            "session_id": session_id,
+            "status": "evaluating",
+            "total_questions": interview.total_questions,
+        }
+    if interview.status != "ongoing":
         raise HTTPException(status_code=400, detail="该面试会话已结束")
 
     interview.status = "evaluating"
@@ -500,7 +506,7 @@ async def end_session(
     interview.total_questions = len(result.scalars().all())
     await db.commit()
 
-    thread_id = f"user_{current_user.id}_interview_{session_id}"
+    thread_id = f"user_{current_user.id}_interview_{sid}"
 
     asyncio.create_task(_run_evaluation_background(sid, current_user.id, thread_id))
 
