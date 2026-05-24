@@ -11,6 +11,10 @@ _trace_id: contextvars.ContextVar[str] = contextvars.ContextVar(
     "trace_id", default=""
 )
 
+_conversation_thread_id: contextvars.ContextVar[str] = contextvars.ContextVar(
+    "conversation_thread_id", default=""
+)
+
 
 def set_current_user_id(user_id: int):
     _current_user_id.set(user_id)
@@ -18,6 +22,14 @@ def set_current_user_id(user_id: int):
 
 def get_current_user_id() -> int:
     return _current_user_id.get()
+
+
+def require_current_user_id() -> int:
+    """返回当前用户 ID；缺失上下文时抛错，避免静默使用 0。"""
+    user_id = _current_user_id.get()
+    if user_id <= 0:
+        raise RuntimeError("current_user_id is not set in context")
+    return user_id
 
 
 def set_trace_id(tid: str = "") -> str:
@@ -29,3 +41,11 @@ def set_trace_id(tid: str = "") -> str:
 
 def get_trace_id() -> str:
     return _trace_id.get()
+
+
+def set_conversation_thread_id(thread_id: str):
+    _conversation_thread_id.set(thread_id)
+
+
+def get_conversation_thread_id() -> str:
+    return _conversation_thread_id.get()

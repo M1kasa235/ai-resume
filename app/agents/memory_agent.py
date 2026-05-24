@@ -10,7 +10,7 @@ from langchain_core.tools import tool
 from langchain_core.messages import HumanMessage
 
 from app.core.llm import get_chat_model
-from app.core.context import get_current_user_id, get_trace_id
+from app.core.context import get_trace_id, require_current_user_id
 from app.agents.config import create_checkpointer, make_middleware
 from app.agents.registry import AgentRegistry
 from app.agents.trace import AgentTrace
@@ -34,7 +34,7 @@ def set_memory_source(source: str):
 async def list_memories() -> str:
     """查看当前用户的所有长期记忆，返回 JSON 列表。
 在决定新增或更新记忆前，先调用此工具了解已有记忆，避免重复。"""
-    uid = get_current_user_id()
+    uid = require_current_user_id()
     memories = await MemoryService().get_all(uid)
     return json.dumps(memories, ensure_ascii=False, default=str)
 
@@ -55,7 +55,7 @@ async def upsert_memory(
 
 注意：fact 和 insight 用 append，preference 和 goal 用 overwrite。"""
     from datetime import datetime
-    uid = get_current_user_id()
+    uid = require_current_user_id()
     if mode == "append":
         ts = datetime.now().strftime("%Y%m%d%H%M%S")
         mem_key = f"{mem_key}_{ts}"
@@ -74,7 +74,7 @@ async def delete_memory(category: str, mem_key: str) -> str:
 参数：
 - category: 记忆类别
 - mem_key: 要删除的记忆标识"""
-    uid = get_current_user_id()
+    uid = require_current_user_id()
     await MemoryService().delete(uid, category, mem_key)
     MemoryService.invalidate_cache(uid)
     tid = get_trace_id()

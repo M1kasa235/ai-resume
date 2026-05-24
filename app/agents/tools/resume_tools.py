@@ -4,7 +4,7 @@ import json
 import logging
 from langchain_core.tools import tool
 from app.rag import get_rag_service
-from app.core.context import get_current_user_id
+from app.core.context import require_current_user_id
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ async def query_resume(question: str) -> str:
 - 要评分/分析/建议 → 用 diagnose_resume
 - 要针对岗位改简历 → 用 optimize_for_job
 - 要看匹配度 → 用 match_resume_to_job"""
-    result = await get_rag_service().query(get_current_user_id(), question)
+    result = await get_rag_service().query(require_current_user_id(), question)
     return json.dumps(result, ensure_ascii=False)
 
 
@@ -36,7 +36,7 @@ async def diagnose_resume() -> str:
 - "简历哪里需要改进"
 
 注意：本工具做的是简历本身质量的诊断，不涉及特定岗位的匹配度。"""
-    result = await get_rag_service().diagnose(get_current_user_id())
+    result = await get_rag_service().diagnose(require_current_user_id())
     return json.dumps(result, ensure_ascii=False)
 
 
@@ -66,7 +66,7 @@ async def optimize_for_job(job_id: int) -> str:
         "description": job.description or "",
         "requirements": job.requirements or "",
     }
-    result = await get_rag_service().optimize_for_job(get_current_user_id(), job_info)
+    result = await get_rag_service().optimize_for_job(require_current_user_id(), job_info)
     return json.dumps(result, ensure_ascii=False)
 
 
@@ -91,7 +91,7 @@ async def match_resume_to_job(job_id: int) -> str:
         if not job:
             return "岗位不存在"
 
-    result = await get_rag_service().match_job(get_current_user_id(), job)
+    result = await get_rag_service().match_job(require_current_user_id(), job)
     return json.dumps(result, ensure_ascii=False)
 
 

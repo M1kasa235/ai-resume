@@ -2,7 +2,7 @@
 
 from typing import Optional
 from langchain_core.tools import tool
-from app.core.context import get_current_user_id
+from app.core.context import require_current_user_id
 
 
 @tool
@@ -94,7 +94,7 @@ async def get_job_recommendations(limit: int = 5) -> str:
     from app.models.job import Job
     from sqlalchemy import select, or_
 
-    user_id = get_current_user_id()
+    user_id = require_current_user_id()
     async with AsyncSessionLocal() as session:
         user = (await session.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
         if not user:

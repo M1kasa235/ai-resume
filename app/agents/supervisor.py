@@ -9,7 +9,12 @@ from langchain_core.tools import tool
 from langchain_core.messages import HumanMessage
 
 from app.core.llm import get_chat_model
-from app.core.context import get_current_user_id, get_trace_id
+from app.core.context import (
+    get_trace_id,
+    require_current_user_id,
+    set_conversation_thread_id,
+    get_conversation_thread_id,
+)
 from app.agents.config import create_checkpointer, make_middleware
 from app.agents.agent import get_career_agent
 from app.agents.resume_agent import get_resume_agent
@@ -64,7 +69,10 @@ SUB_AGENT_TIMEOUT = 45  # 子 agent 超时秒数
 async def _invoke_agent(role: str, query: str, uid: int) -> str:
     """调用单个子 agent，返回回复文本。超时返回友好提示。"""
     agent = get_resume_agent() if role == "resume" else get_career_agent()
-    thread_id = f"user_{uid}_{role}"
+    parent_thread_id = get_conversation_thread_id()
+    thread_id = (
+        f"{parent_thread_id}:{role}" if parent_thread_id else f"user_{uid}_{role}"
+    )
     today = date.today().isoformat()
     contextualized = f"[系统上下文：今天是 {today}]\n\n{query}"
     try:
@@ -101,7 +109,7 @@ async def resume_agent_tool(query: str) -> str:
 
 注意：诊断、优化、匹配这三种返回的是结构化分析结果，会按原样展示给用户，不会做二次浓缩。
 如果用户需求同时涉及简历和求职（如"根据简历推荐岗位"），优先调用 both_agents_tool。"""
-    return await _invoke_agent("resume", query, get_current_user_id())
+    return await _invoke_agent("resume", query, require_current_user_id())
 
 
 @tool
@@ -116,7 +124,7 @@ async def career_agent_tool(query: str) -> str:
 - "面试一般问什么/怎么准备面试"       → 面试技巧（知识库）
 
 如果用户需求同时涉及简历和求职（如"根据简历推荐岗位"），优先调用 both_agents_tool。"""
-    return await _invoke_agent("career", query, get_current_user_id())
+    return await _invoke_agent("career", query, require_current_user_id())
 
 
 @tool
@@ -131,7 +139,7 @@ async def both_agents_tool(query: str) -> str:
 - 任何同时涉及「简历本身」和「外部岗位市场」的复合需求
 
 注意：本工具会并行调用两个专家，比逐个调用节省约一半时间。"""
-    uid = get_current_user_id()
+    uid = require_current_user_id()
 
     resume_task = _invoke_agent("resume", query, uid)
     career_task = _invoke_agent("career", query, uid)
@@ -164,7 +172,7 @@ async def memory_agent_tool(query: str) -> str:
 也可以主动调用：当对话中出现了值得长期记住的用户信息（偏好、简历事实、目标、
 行为洞察），调用此工具让记忆管家分析并存储。"""
     from app.agents.memory_agent import run_memory_agent, set_memory_source
-    uid = get_current_user_id()
+    uid = require_current_user_id()
     thread_id = f"user_{uid}_memory"
     set_memory_source("explicit")
     asyncio.create_task(run_memory_agent(query, thread_id))
@@ -178,7 +186,7 @@ async def _maybe_trigger_memory_agent(thread_id: str):
         _message_counter[thread_id] = 0
         from app.agents.memory_agent import run_memory_agent
         from app.agents.memory import MemoryService
-        uid = get_current_user_id()
+        uid = require_current_user_id()
         try:
             # 清理过期记忆
             if uid:
@@ -281,7 +289,8 @@ def get_supervisor():
 async def supervisor_stream(prompt: str, thread_id: str):
     """流式调用 supervisor agent"""
     from langchain_core.messages import AIMessageChunk
-    uid = get_current_user_id()
+    set_conversation_thread_id(thread_id)
+    uid = require_current_user_id()
     tid = get_trace_id()
     logger.info(f"[trace={tid}] supervisor_stream start user={uid} prompt={prompt[:80]}")
 

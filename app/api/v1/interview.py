@@ -74,6 +74,46 @@ def _parse_evaluation(raw: str) -> tuple[list[dict], int | None, str | None, str
     return evaluations, overall_score, strength, weakness, improvement
 
 
+async def _build_interview_round_prompt(
+    interview: AIInterview,
+    user_id: int,
+    is_first_round: bool,
+    user_message: str | None,
+) -> str:
+    """统一构建面试提问 prompt，确保流式与非流式路径行为一致。"""
+    if not is_first_round:
+        return user_message or ""
+
+    frontend_type = interview.interview_type
+    if frontend_type == "behavioral":
+        frontend_type = "hr"
+
+    resume_text = ""
+    try:
+        from app.rag import get_rag_service
+
+        rag = get_rag_service()
+        focus_parts = [frontend_type]
+        if interview.job_description:
+            focus_parts.append(interview.job_description[:200])
+        resume_text = await rag.retrieve_raw_chunks(
+            user_id,
+            focus=" ".join(focus_parts),
+        )
+    except Exception as e:
+        logger.warning(f"简历检索失败: {e}")
+
+    from app.agents.interview_agent import build_initial_prompt
+
+    return build_initial_prompt(
+        interview_type=frontend_type,
+        job_title=interview.job_title or "未指定",
+        company_name=interview.company_name or "",
+        job_description=interview.job_description or "",
+        resume_text=resume_text,
+    )
+
+
 @router.post("/ai-interview/sessions")
 async def start_interview(
     request: AIInterviewStartRequest,
@@ -157,37 +197,13 @@ async def stream_message(
 
     thread_id = f"user_{current_user.id}_interview_{sid}"
 
-    from app.agents.interview_agent import conduct_interview_stream, build_initial_prompt
-
-    # 首次：预检索简历 + 构建开场白提示词
-    if is_first:
-        frontend_type = interview.interview_type
-        if frontend_type == "behavioral":
-            frontend_type = "hr"
-
-        resume_text = ""
-        try:
-            from app.rag import get_rag_service
-            rag = get_rag_service()
-            focus_parts = [frontend_type]
-            if interview.job_description:
-                focus_parts.append(interview.job_description[:200])
-            resume_text = await rag.retrieve_raw_chunks(
-                current_user.id,
-                focus=" ".join(focus_parts),
-            )
-        except Exception as e:
-            logger.warning(f"简历检索失败: {e}")
-
-        prompt = build_initial_prompt(
-            interview_type=frontend_type,
-            job_title=interview.job_title or "未指定",
-            company_name=interview.company_name or "",
-            job_description=interview.job_description or "",
-            resume_text=resume_text,
-        )
-    else:
-        prompt = request.message or ""
+    from app.agents.interview_agent import conduct_interview_stream
+    prompt = await _build_interview_round_prompt(
+        interview=interview,
+        user_id=current_user.id,
+        is_first_round=is_first,
+        user_message=request.message,
+    )
 
     async def event_stream():
         full_response = ""
@@ -270,12 +286,20 @@ async def send_message(
             "limit_reached": True,
         }
 
-    thread_id = f"user_{current_user.id}_interview_{request.session_id}"
+    is_first = last_qa is None
+    thread_id = f"user_{current_user.id}_interview_{session_id_int}"
 
     from app.agents.interview_agent import conduct_interview
 
+    prompt = await _build_interview_round_prompt(
+        interview=interview,
+        user_id=current_user.id,
+        is_first_round=is_first,
+        user_message=request.message,
+    )
+
     try:
-        ai_response = await conduct_interview(request.message, thread_id)
+        ai_response = await conduct_interview(prompt, thread_id)
     except Exception as e:
         logger.error(f"面试 Agent 调用失败: {e}")
         ai_response = "好的，谢谢你的回答。我们继续下一题。"

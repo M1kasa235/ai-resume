@@ -73,9 +73,30 @@ async def clear_history(
 
     clear_chat_history(isolated_thread_id)
 
+    # 同时清理关联的子 agent / 记忆线程，确保“清空会话”语义一致。
+    checkpointer = create_checkpointer()
+    related_threads = [
+        f"{isolated_thread_id}:resume",
+        f"{isolated_thread_id}:career",
+        f"{isolated_thread_id}:memory",
+        f"{isolated_thread_id}_auto",
+        f"{isolated_thread_id}_clear",
+        # 兼容历史 thread 规则（user_{uid}_{role}）。
+        f"user_{current_user.id}_resume",
+        f"user_{current_user.id}_career",
+        f"user_{current_user.id}_memory",
+    ]
+    for tid in related_threads:
+        try:
+            checkpointer.delete_thread(tid)
+        except Exception:
+            logger.debug("清理子线程失败: %s", tid, exc_info=True)
+
     # 清理轮数计数器
     from app.agents.supervisor import _message_counter
     _message_counter.pop(isolated_thread_id, None)
+    for tid in related_threads:
+        _message_counter.pop(tid, None)
 
     if summary:
         from app.agents.memory_agent import set_memory_source
