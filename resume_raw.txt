@@ -1,0 +1,96 @@
+0: 教育背景 
+1: / Education 
+2: 2023.09 – 至今           云南师范大学    计算机科学与技术 / 本科 
+3: 主修课程： 数据结构，python 数据分析与可视化，数据库技术，计算机网络，操作系统，算法设计与分析，机器学习。
+4: 技术栈 
+5: / technology 
+6: **AI & LLM** 
+7: - 熟悉 **LangChain / LangGraph** Agent 开发框架，理解 Tool Calling、Middleware、Checkpointer 机制 
+8: - 掌握 **RAG 全链路**：Chroma 向量库 → 混合检索（向量 + BM25 + RRF）→重排序 → LLM 生成 
+9: - 熟练 **Prompt Engineering**：结构化输出、Few-shot、思维链，实际驱动 DeepSeek API 完成简历解析与对话 
+10: - 了解 **多 Agent 协作**：Supervisor 编排模式，子 Agent 通过 tool 包装实现任务派发与结果聚合 
+11: **后端开发** 
+12: - 精通 **FastAPI** 异步框架，独立设计并实现 63 个 RESTful API 端点 
+13: - 熟练 **SQLAlchemy 2.0** 异步 ORM + Pydantic 数据校验，全链路 async/await 
+14: - 掌握 **JWT 双 Token** 认证（access + refresh），RBAC 权限隔离（用户/管理员） 
+15: - 熟悉 **WebSocket** 实时双向通信，**SSE** 服务端推送流式响应 
+16: 项目经历 
+17: / experience
+18: AI 求职助手 
+19: | 全栈独立开发 | 2026.03 – 2026.05 
+20: 基于大语言模型的智能求职平台，支持简历智能解析、岗位语义匹配、AI 模拟面试与多 Agent 对话。 
+21: 混合检索引擎 
+22: · 问题：纯向量检索对精确关键词（公司名/技术栈/人名）召回差，Chroma 默认参数未针对中文优化。 
+23: · 方案：自研 BM25 内存索引作第二路召回，RRF 算法无参数融合；按查询长度自适应切换策略——短查询用 HyDE 假 
+24: 设文档扩写，长查询 Multi-Query 拆解合并；经 DashScope gte-rerank 精排后送入 LLM 生成，召回命中率显著提 
+25: 升。 
+26: 多 Agent 架构与工程解耦 
+27: · 问题：初期 RAG 引擎耦合在 Agent 包内，四份工具函数各自创建 RAG 实例，架构不可扩展。 
+28: · 方案：RAG 重构为独立基础设施包（app/rag/），建立 ResumeRAGService 服务层统一封装 pipeline，@lru_cache 
+29: 延迟单例消除重复。Agent 层 Supervisor 编排双 Agent（求职顾问/简历助手），子 Agent 各自持有独立 
+30: Checkpointer，通过 @tool 包装供 Supervisor 调度，SSE 流式输出。依赖
+31: 方向：agents → rag → core。 
+32: PDF 简历结构化解析 
+33: · 问题：简历 PDF 格式多样（文本框/表格/多栏），pypdf 提取后丢失层次，无法按章节分块入库。 
+34: · 方案：基于简历模板设计章节识别规则做自动切分，每 chunk 生成唯一 chunk_id 支持溯源与增量更新。Chroma 多 
+35: 集合物理隔离（resume_chunks / j
+36: 教育背景 
+37: / Education 
+38: 2023.09 – 至今           云南师范大学    计算机科学与技术 / 本科 
+39: 主修课程： 数据结构，python 数据分析与可视化，数据库技术，计算机网络，操作系统，算法设计与分析，机器学习。
+40: 技术栈 
+41: / technology 
+42: **AI & LLM** 
+43: - 熟悉 **LangChain / LangGraph** Agent 开发框架，理解 Tool Calling、Middleware、Checkpointer 机制 
+44: - 掌握 **RAG 全链路**：Chroma 向量库 → 混合检索（向量 + BM25 + RRF）→重排序 → LLM 生成 
+45: - 熟练 **Prompt Engineering**：结构化输出、Few-shot、思维链，实际驱动 DeepSeek API 完成简历解析与对话 
+46: - 了解 **多 Agent 协作**：Supervisor 编排模式，子 Agent 通过 tool 包装实现任务派发与结果聚合 
+47: **后端开发** 
+48: - 精通 **FastAPI** 异步框架，独立设计并实现 63 个 RESTful API 端点 
+49: - 熟练 **SQLAlchemy 2.0** 异步 ORM + Pydantic 数据校验，全链路 async/await 
+50: - 掌握 **JWT 双 Token** 认证（access + refresh），RBAC 权限隔离（用户/管理员） 
+51: - 熟悉 **WebSocket** 实时双向通信，**SSE** 服务端推送流式响应 
+52: 项目经历 
+53: / experience
+54: AI 求职助手 
+55: | 全栈独立开发 | 2026.03 – 2026.05 
+56: 基于大语言模型的智能求职平台，支持简历智能解析、岗位语义匹配、AI 模拟面试与多 Agent 对话。 
+57: 混合检索引擎 
+58: · 问题：纯向量检索对精确关键词（公司名/技术栈/人名）召回差，Chroma 默认参数未针对中文优化。 
+59: · 方案：自研 BM25 内存索引作第二路召回，RRF 算法无参数融合；按查询长度自适应切换策略——短查询用 HyDE 假 
+60: 设文档扩写，长查询 Multi-Query 拆解合并；经 DashScope gte-rerank 精排后送入 LLM 生成，召回命中率显著提 
+61: 升。 
+62: 多 Agent 架构与工程解耦 
+63: · 问题：初期 RAG 引擎耦合在 Agent 包内，四份工具函数各自创建 RAG 实例，架构不可扩展。 
+64: · 方案：RAG 重构为独立基础设施包（app/rag/），建立 ResumeRAGService 服务层统一封装 pipeline，@lru_cache 
+65: 延迟单例消除重复。Agent 层 Supervisor 编排双 Agent（求职顾问/简历助手），子 Agent 各自持有独立 
+66: Checkpointer，通过 @tool 包装供 Supervisor 调度，SSE 流式输出。依赖
+67: 方向：agents → rag → core。 
+68: PDF 简历结构化解析 
+69: · 问题：简历 PDF 格式多样（文本框/表格/多栏），pypdf 提取后丢失层次，无法按章节分块入库。 
+70: · 方案：基于简历模板设计章节识别规则做自动切分，每 chunk 生成唯一 chunk_id 支持溯源与增量更新。Chroma 多 
+71: 集合物理隔离（resume_chunks / j
+72: 彭安旭
+73: ”
+74: 求职意向：AI 应用开发
+75: GitHub：github.com/M1kasa235
+76: 彭安旭
+77: ”
+78: 求职意向：AI 应用开发
+79: GitHub：github.com/M1kasa235
+80: 现居：
+81: 昆明市 呈贡区
+82: 生
+83: 生日：2005- 04- 23
+84: 现居：
+85: 昆明市 呈贡区
+86: 生
+87: 生日：2005- 04- 23
+88: 电话：
+89: 电话：18849691170
+90: 邮箱：
+91: 邮箱：762891671@qq.com
+92: 电话：
+93: 电话：18849691170
+94: 邮箱：
+95: 邮箱：762891671@qq.com
