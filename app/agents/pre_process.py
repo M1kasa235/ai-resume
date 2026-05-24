@@ -76,21 +76,14 @@ async def pre_process(user_id: int, thread_id: str, message: str) -> str:
     if intent.get("needs_memory"):
         try:
             from app.agents.memory import MemoryService
-            ctx = await MemoryService().format_context(user_id, message)
+            svc = MemoryService()
+            result = await svc.retrieve_for_injection(
+                user_id=user_id,
+                query=message,
+                category_priority=intent.get("priority_categories", []),
+            )
+            ctx = result.get("text", "")
             if ctx:
-                # 按意图优先级重排 category 顺序
-                cats = intent.get("priority_categories", [])
-                if cats:
-                    lines = ctx.split("\n")
-                    ordered = []
-                    for cat in cats:
-                        for line in lines:
-                            if line not in ordered:
-                                ordered.append(line)
-                    for line in lines:
-                        if line not in ordered:
-                            ordered.append(line)
-                    ctx = "\n".join(ordered)
                 parts.append(ctx)
         except Exception as e:
             logger.warning(f"记忆检索失败: {e}")
