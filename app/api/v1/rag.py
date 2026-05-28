@@ -2,12 +2,10 @@
 
 import logging
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 
-from app.api.deps import get_current_user, get_db
+from app.services.job_lookup import fetch_job
+from app.api.deps import get_current_user
 from app.models.user import User
-from app.models.job import Job
 from app.rag import get_rag_service
 from app.schemas.rag import (
     ResumeQueryRequest,
@@ -45,14 +43,11 @@ async def query_resume(
 async def match_job(
     request: JobMatchRequest,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
 ):
     """岗位匹配度分析"""
     try:
-        stmt = select(Job).where(Job.id == request.job_id)
-        result = await db.execute(stmt)
-        job = result.scalar_one_or_none()
-        if not job:
+        job = await fetch_job(request.job_id)
+        if not job or not job.is_active:
             raise HTTPException(status_code=404, detail="岗位不存在")
 
         data = await get_rag_service().match_job(current_user.id, job)

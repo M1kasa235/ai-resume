@@ -138,29 +138,21 @@ class MemoryExtractionMixin:
             )
             upserted += 1
 
-        self.invalidate_cache(user_id)
+        await self.invalidate_cache(user_id)
         return {"upserted": upserted, "deleted": deleted}
 
-    async def process_event(
+    async def _process_claimed_event(
         self,
         event_id: str,
         llm=None,
         max_retries: int = 3,
     ) -> dict | None:
+        """Process an event already claimed as processing."""
         event = await self.get_event(event_id)
         if not event:
-            return None
-        if event.get("status") == "done":
-            if event.get("result_json"):
-                try:
-                    return json.loads(event["result_json"])
-                except json.JSONDecodeError:
-                    return None
-            return None
-        if event.get("status") == "dead_letter":
+            await self._mark_event_status(event_id, "failed", last_error="event missing after claim")
             return None
 
-        await self._mark_event_status(event_id, "processing")
         if llm is None:
             from app.core.llm import get_chat_model
 
@@ -223,6 +215,38 @@ class MemoryExtractionMixin:
             logger.warning("处理记忆事件失败: id=%s retry=%s", event_id, retry_count, exc_info=True)
             return None
 
+    async def process_event(
+        self,
+        event_id: str,
+        llm=None,
+        max_retries: int = 3,
+    ) -> dict | None:
+        event = await self.get_event(event_id)
+        if not event:
+            return None
+        if event.get("status") == "done":
+            if event.get("result_json"):
+                try:
+                    return json.loads(event["result_json"])
+                except json.JSONDecodeError:
+                    return None
+            return None
+        if event.get("status") == "dead_letter":
+            return None
+        if event.get("status") == "processing":
+            return None
+
+        if not await self._try_claim_event(event_id, max_retries):
+            event = await self.get_event(event_id)
+            if event and event.get("status") == "done" and event.get("result_json"):
+                try:
+                    return json.loads(event["result_json"])
+                except json.JSONDecodeError:
+                    return None
+            return None
+
+        return await self._process_claimed_event(event_id, llm=llm, max_retries=max_retries)
+
     async def process_pending_events(
         self,
         llm=None,
@@ -230,34 +254,13 @@ class MemoryExtractionMixin:
         max_retries: int = 3,
         user_id: int | None = None,
     ) -> int:
-        conn = await self._get_conn()
         batch_size = max(1, min(200, batch_size))
-        if user_id is None:
-            rows = await conn.execute_fetchall(
-                """
-                SELECT id FROM memory_events
-                WHERE status IN ('pending', 'failed')
-                  AND retry_count < ?
-                ORDER BY created_at ASC
-                LIMIT ?
-                """,
-                (max_retries, batch_size),
-            )
-        else:
-            rows = await conn.execute_fetchall(
-                """
-                SELECT id FROM memory_events
-                WHERE user_id=?
-                  AND status IN ('pending', 'failed')
-                  AND retry_count < ?
-                ORDER BY created_at ASC
-                LIMIT ?
-                """,
-                (user_id, max_retries, batch_size),
-            )
         count = 0
-        for row in rows:
-            result = await self.process_event(row["id"], llm=llm, max_retries=max_retries)
+        for _ in range(batch_size):
+            event_id = await self._claim_next_pending_event(max_retries, user_id)
+            if not event_id:
+                break
+            result = await self._process_claimed_event(event_id, llm=llm, max_retries=max_retries)
             if result is not None:
                 count += 1
         return count
@@ -281,5 +284,3 @@ class MemoryExtractionMixin:
         if not result:
             return None
         return result.get("delta")
-
-    

@@ -12,6 +12,15 @@ from sqlalchemy import select, desc, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db, inject_request_context
+from app.api.v1.interview_helpers import (
+    MAX_QUESTIONS,
+    interview_thread_id,
+    normalize_request_interview_type,
+    prepare_interview_round,
+    save_interview_question,
+    to_db_interview_type,
+    to_frontend_interview_type,
+)
 from app.core.async_tasks import create_background_task
 from app.core.request_context import RequestContext
 from app.models.interview import AIInterview, AIInterviewQA
@@ -24,8 +33,6 @@ from app.schemas.interview import (
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["AI面试"])
 
-MAX_QUESTIONS = 25
-
 
 def _parse_evaluation(raw: str) -> tuple[list[dict], int | None, str | None, str | None, str | None]:
     """解析 Agent 返回的 Markdown 评估报告，提取逐题评分和综合评估"""
@@ -35,7 +42,6 @@ def _parse_evaluation(raw: str) -> tuple[list[dict], int | None, str | None, str
     weakness = None
     improvement = None
 
-    # 提取逐题评估块
     qa_blocks = re.split(r'(?=### Q\d+:)', raw)
     for block in qa_blocks:
         if not block.strip().startswith('### Q'):
@@ -56,12 +62,10 @@ def _parse_evaluation(raw: str) -> tuple[list[dict], int | None, str | None, str
             "suggested_answer": suggested,
         })
 
-    # 综合评分
     score_match = re.search(r'综合评分[：:]\*\*\s*(\d+)', raw)
     if score_match:
         overall_score = int(score_match.group(1))
 
-    # 优劣势
     strength_match = re.search(r'### 优势分析\s*\n(.+?)(?=### 待改进|### 改进|\Z)', raw, re.DOTALL)
     if strength_match:
         strength = strength_match.group(1).strip()
@@ -85,9 +89,7 @@ async def _build_interview_round_prompt(
     if not is_first_round:
         return user_message or ""
 
-    frontend_type = interview.interview_type
-    if frontend_type == "behavioral":
-        frontend_type = "hr"
+    frontend_type = to_frontend_interview_type(interview.interview_type)
 
     resume_text = ""
     try:
@@ -104,7 +106,7 @@ async def _build_interview_round_prompt(
     except Exception as e:
         logger.warning(f"简历检索失败: {e}")
 
-    from app.agents.interview_agent import build_initial_prompt
+    from app.agents.facade.interview import build_initial_prompt
 
     return build_initial_prompt(
         interview_type=frontend_type,
@@ -112,6 +114,13 @@ async def _build_interview_round_prompt(
         company_name=interview.company_name or "",
         job_description=interview.job_description or "",
         resume_text=resume_text,
+    )
+
+
+def _limit_reached_reply() -> str:
+    return (
+        f"本次面试已达到 {MAX_QUESTIONS} 题的上限。"
+        f"感谢你的参与！请点击「结束面试」查看完整评估报告。"
     )
 
 
@@ -124,11 +133,8 @@ async def start_interview(
 ):
     """创建新的 AI 面试会话，即时返回。首问由 /stream 端点流式生成。"""
 
-    interview_type = request.interview_type or "comprehensive"
-    if interview_type not in ("technical", "hr", "comprehensive"):
-        interview_type = "comprehensive"
-
-    db_interview_type = "behavioral" if interview_type == "hr" else interview_type
+    interview_type = normalize_request_interview_type(request.interview_type)
+    db_interview_type = to_db_interview_type(interview_type)
 
     interview = AIInterview(
         user_id=current_user.id,
@@ -175,65 +181,48 @@ async def stream_message(
     if interview.status != "ongoing":
         raise HTTPException(status_code=400, detail="该面试会话已结束")
 
-    # 判断是否首次调用
-    stmt = (
-        select(AIInterviewQA)
-        .where(AIInterviewQA.interview_id == sid)
-        .order_by(desc(AIInterviewQA.sequence))
-        .limit(1)
+    round_state = await prepare_interview_round(
+        db,
+        interview,
+        current_user.id,
+        request.message,
+        commit_user_answer=True,
     )
-    result = await db.execute(stmt)
-    last_qa = result.scalar_one_or_none()
-    is_first = last_qa is None
-
-    next_sequence = (last_qa.sequence + 1) if last_qa else 1
-    if next_sequence > MAX_QUESTIONS:
+    if round_state.limit_reached:
         raise HTTPException(status_code=400, detail="已达 25 题上限")
 
-    # 非首次：保存用户回答
-    if not is_first and request.message:
-        last_qa.answer = request.message
-        db.add(last_qa)
-        await db.commit()
+    from app.agents.facade.interview import conduct_interview_stream
 
-    thread_id = f"user_{current_user.id}_interview_{sid}"
-
-    from app.agents.interview_agent import conduct_interview_stream
     prompt = await _build_interview_round_prompt(
         interview=interview,
         user_id=current_user.id,
-        is_first_round=is_first,
+        is_first_round=round_state.is_first,
         user_message=request.message,
     )
 
     async def event_stream():
         full_response = ""
         try:
-            async for token in conduct_interview_stream(prompt, thread_id):
+            async for token in conduct_interview_stream(prompt, round_state.thread_id):
                 full_response += token
                 yield f"data: {json.dumps({'type': 'token', 'content': token}, ensure_ascii=False)}\n\n"
 
-            # 流结束后用独立会话写入，避免复用请求级 session 的生命周期竞态。
             from app.db.session import AsyncSessionLocal
 
             async with AsyncSessionLocal() as stream_db:
-                stream_interview = await stream_db.get(AIInterview, sid)
-                if not stream_interview:
-                    raise RuntimeError("面试会话不存在，无法保存流式结果")
-
-                new_qa = AIInterviewQA(
-                    interview_id=sid,
-                    sequence=next_sequence,
-                    question=full_response or "好的，我们继续下一题。",
+                await save_interview_question(
+                    stream_db,
+                    sid,
+                    round_state.next_sequence,
+                    full_response,
                 )
-                stream_db.add(new_qa)
-                stream_interview.total_questions = next_sequence
-                await stream_db.commit()
 
-            yield f"data: {json.dumps({'type': 'done', 'sequence': next_sequence})}\n\n"
+            yield f"data: {json.dumps({'type': 'done', 'sequence': round_state.next_sequence})}\n\n"
         except Exception as e:
             logger.error(f"流式生成失败: {e}", exc_info=True)
-            yield f"data: {json.dumps({'type': 'error', 'message': '生成失败，请重试'})}\n\n"
+            from app.agents.common.errors import agent_stream_error_message
+
+            yield f"data: {json.dumps({'type': 'error', 'message': agent_stream_error_message(e)}, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
@@ -260,59 +249,46 @@ async def send_message(
     if interview.status != "ongoing":
         raise HTTPException(status_code=400, detail="该面试会话已结束")
 
-    stmt = (
-        select(AIInterviewQA)
-        .where(AIInterviewQA.interview_id == interview.id)
-        .order_by(desc(AIInterviewQA.sequence))
-        .limit(1)
+    round_state = await prepare_interview_round(
+        db,
+        interview,
+        current_user.id,
+        request.message,
+        commit_user_answer=False,
     )
-    result = await db.execute(stmt)
-    last_qa = result.scalar_one_or_none()
 
-    if last_qa:
-        last_qa.answer = request.message
-        db.add(last_qa)
-
-    next_sequence = (last_qa.sequence + 1) if last_qa else 1
-
-    if next_sequence > MAX_QUESTIONS:
-        interview.total_questions = last_qa.sequence if last_qa else 0
+    if round_state.limit_reached:
+        interview.total_questions = round_state.last_qa.sequence if round_state.last_qa else 0
         await db.commit()
         return {
             "session_id": request.session_id,
-            "reply": (
-                f"本次面试已达到 {MAX_QUESTIONS} 题的上限。"
-                f"感谢你的参与！请点击「结束面试」查看完整评估报告。"
-            ),
+            "reply": _limit_reached_reply(),
             "limit_reached": True,
         }
 
-    is_first = last_qa is None
-    thread_id = f"user_{current_user.id}_interview_{session_id_int}"
-
-    from app.agents.interview_agent import conduct_interview
+    from app.agents.facade.interview import conduct_interview
 
     prompt = await _build_interview_round_prompt(
         interview=interview,
         user_id=current_user.id,
-        is_first_round=is_first,
+        is_first_round=round_state.is_first,
         user_message=request.message,
     )
 
     try:
-        ai_response = await conduct_interview(prompt, thread_id)
+        ai_response = await conduct_interview(prompt, round_state.thread_id)
     except Exception as e:
-        logger.error(f"面试 Agent 调用失败: {e}")
-        ai_response = "好的，谢谢你的回答。我们继续下一题。"
+        logger.error(f"面试 Agent 调用失败: {e}", exc_info=True)
+        from app.agents.common.errors import agent_stream_error_message
 
-    new_qa = AIInterviewQA(
-        interview_id=interview.id,
-        sequence=next_sequence,
-        question=ai_response,
+        ai_response = agent_stream_error_message(e)
+
+    await save_interview_question(
+        db,
+        session_id_int,
+        round_state.next_sequence,
+        ai_response,
     )
-    db.add(new_qa)
-    interview.total_questions = next_sequence
-    await db.commit()
 
     return {
         "session_id": request.session_id,
@@ -362,17 +338,13 @@ async def get_session(
                 "created_at": qa.created_at.isoformat() if qa.created_at else None,
             })
 
-    frontend_type = interview.interview_type
-    if frontend_type == "behavioral":
-        frontend_type = "hr"
-
     return {
         "session_id": session_id,
         "job_title": interview.job_title,
         "company_name": interview.company_name,
         "job_description": interview.job_description,
         "status": interview.status,
-        "interview_type": frontend_type,
+        "interview_type": to_frontend_interview_type(interview.interview_type),
         "messages": messages,
     }
 
@@ -410,11 +382,9 @@ async def _run_evaluation_background(interview_id: int, user_id: int, thread_id:
                 parts.append("")
             transcript_text = "\n".join(parts)
 
-            frontend_type = interview.interview_type
-            if frontend_type == "behavioral":
-                frontend_type = "hr"
+            frontend_type = to_frontend_interview_type(interview.interview_type)
 
-            from app.agents.interview_agent import conduct_interview, build_evaluation_prompt
+            from app.agents.facade.interview import conduct_interview, build_evaluation_prompt
             eval_prompt = build_evaluation_prompt(transcript_text, frontend_type)
 
             try:
@@ -462,11 +432,7 @@ async def _run_evaluation_background(interview_id: int, user_id: int, thread_id:
 
 
 async def recover_stuck_evaluations():
-    """启动时恢复卡在 evaluating 状态的面试评估
-
-    遍历 status == 'evaluating' 且 ended_at 超过 90 秒的会话，
-    重新触发后台评估。服务重启后评估丢失的场景靠此恢复。
-    """
+    """启动时恢复卡在 evaluating 状态的面试评估"""
     from app.db.session import AsyncSessionLocal
 
     async with AsyncSessionLocal() as db:
@@ -493,7 +459,7 @@ async def recover_stuck_evaluations():
         logger.warning(f"恢复 {len(recoverable)} 个卡住的面试评估")
 
         for i, iv in enumerate(recoverable):
-            thread_id = f"user_{iv.user_id}_interview_{iv.id}"
+            thread_id = interview_thread_id(iv.user_id, iv.id)
             create_background_task(
                 _run_evaluation_background(iv.id, iv.user_id, thread_id),
                 user_id=iv.user_id,
@@ -501,7 +467,7 @@ async def recover_stuck_evaluations():
                 source="interview_recovery",
             )
             if i < len(recoverable) - 1:
-                await asyncio.sleep(2)  # 错开 LLM 调用，避免并发风暴
+                await asyncio.sleep(2)
 
 
 @router.post("/ai-interview/sessions/{session_id}/end")
@@ -543,7 +509,7 @@ async def end_session(
     interview.total_questions = len(result.scalars().all())
     await db.commit()
 
-    thread_id = f"user_{current_user.id}_interview_{sid}"
+    thread_id = interview_thread_id(current_user.id, sid)
 
     create_background_task(
         _run_evaluation_background(sid, current_user.id, thread_id),
@@ -598,15 +564,11 @@ async def get_report(
             "suggested_answer": qa.suggested_answer,
         })
 
-    frontend_type = interview.interview_type
-    if frontend_type == "behavioral":
-        frontend_type = "hr"
-
     return {
         "session_id": session_id,
         "job_title": interview.job_title,
         "company_name": interview.company_name,
-        "interview_type": frontend_type,
+        "interview_type": to_frontend_interview_type(interview.interview_type),
         "status": interview.status,
         "total_questions": interview.total_questions,
         "overall_score": interview.overall_score,
@@ -641,13 +603,11 @@ async def list_reports(
         .order_by(desc(AIInterview.ended_at))
     )
 
-    # 总数
     total_result = await db.execute(
         select(AIInterview).where(AIInterview.user_id == current_user.id, status_filter)
     )
     total = len(total_result.scalars().all())
 
-    # 分页
     offset = (page - 1) * size
     page_stmt = stmt.offset(offset).limit(size)
     result = await db.execute(page_stmt)
@@ -655,14 +615,11 @@ async def list_reports(
 
     items = []
     for iv in interviews:
-        ft = iv.interview_type
-        if ft == "behavioral":
-            ft = "hr"
         items.append({
             "session_id": str(iv.id),
             "job_title": iv.job_title,
             "company_name": iv.company_name,
-            "interview_type": ft,
+            "interview_type": to_frontend_interview_type(iv.interview_type),
             "status": iv.status,
             "total_questions": iv.total_questions,
             "overall_score": iv.overall_score,

@@ -56,6 +56,17 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
+# Accidental / local artifacts
+127.0.0.1
+=5.0.0
+
+# Chroma vector store runtime data
+db/chroma/
+
+# Personal resume drafts (do not commit)
+*-简历.docx
+简历-*.md
+
 # Uploads (用户文件不应该提交)
 uploads/*
 !uploads/.gitkeep

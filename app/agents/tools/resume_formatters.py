@@ -6,13 +6,23 @@ import json
 import re
 from typing import Any
 
+from app.agents.common.protocol import PASSTHROUGH_END, PASSTHROUGH_START
+
+_JSON_FENCE_RE = re.compile(r"```json\s*([\s\S]*?)```", re.IGNORECASE)
+_JSON_BLOCK_RE = re.compile(r"\{[\s\S]*\}")
+_FILLER_LINE_RE = re.compile(
+    r"^(好的[，,]?|我来|让我|请稍等|全面诊断|我来看看).*[！!]?\s*$"
+)
+_REPORT_MARKER = "## 简历诊断报告"
+_SCORE_MARKER = "**综合评分**"
+
 
 def format_diagnosis_report(data: dict[str, Any]) -> str:
     if data.get("error"):
         return f"诊断失败：{data['error']}"
 
     lines = [
-        "## 简历诊断报告",
+        _REPORT_MARKER,
         f"**综合评分**：{data.get('overall_score', 'N/A')}",
         "",
     ]
@@ -159,36 +169,129 @@ def format_query_report(data: dict[str, Any]) -> str:
     return json.dumps(data, ensure_ascii=False)
 
 
-_JSON_BLOCK_RE = re.compile(r"\{[\s\S]*\}")
+def extract_passthrough(text: str) -> str | None:
+    if PASSTHROUGH_START not in text or PASSTHROUGH_END not in text:
+        return None
+    start = text.index(PASSTHROUGH_START) + len(PASSTHROUGH_START)
+    end = text.index(PASSTHROUGH_END)
+    return text[start:end].strip()
 
 
-def strip_json_from_reply(reply: str) -> str:
-    """If the model leaked raw JSON, replace it with formatted markdown."""
-    text = (reply or "").strip()
-    if not text or '"overall_score"' not in text:
-        return text
-
-    match = _JSON_BLOCK_RE.search(text)
+def _format_json_diagnosis(raw: str) -> str | None:
+    match = _JSON_BLOCK_RE.search(raw)
     if not match:
-        return text
-
+        return None
     try:
         data = json.loads(match.group())
     except json.JSONDecodeError:
-        return text
-
+        return None
     if "overall_score" in data or "strengths" in data:
-        formatted = format_diagnosis_report(data)
-    elif "optimized_sections" in data or "full_resume" in data:
-        formatted = format_optimize_report(data)
-    elif "dimensions" in data or "overall_score" in data:
-        formatted = format_match_report(data)
-    else:
+        return format_diagnosis_report(data)
+    if "optimized_sections" in data or "full_resume" in data:
+        return format_optimize_report(data)
+    if "dimensions" in data:
+        return format_match_report(data)
+    return None
+
+
+def _strip_json_fences(text: str) -> str:
+    return _JSON_FENCE_RE.sub("", text).strip()
+
+
+def _strip_inline_json(text: str) -> str:
+    if '"overall_score"' not in text and '"strengths"' not in text:
+        return text
+    # Only remove JSON blob when a formatted report is also present
+    if _REPORT_MARKER not in text and _SCORE_MARKER not in text:
+        return text
+    match = _JSON_BLOCK_RE.search(text)
+    if not match:
+        return text
+    return (text[: match.start()] + text[match.end() :]).strip()
+
+
+def _strip_leading_filler(text: str) -> str:
+    lines = text.splitlines()
+    while lines:
+        stripped = lines[0].strip()
+        if not stripped:
+            lines.pop(0)
+            continue
+        if _FILLER_LINE_RE.match(stripped):
+            lines.pop(0)
+            continue
+        if stripped.startswith("```"):
+            lines.pop(0)
+            continue
+        break
+    return "\n".join(lines).strip()
+
+
+def _dedupe_diagnosis_reports(text: str) -> str:
+    if text.count(_REPORT_MARKER) <= 1:
+        return text
+    prefix, *sections = text.split(_REPORT_MARKER)
+    blocks = [_REPORT_MARKER + part for part in sections if part.strip()]
+    if not blocks:
+        return text.strip()
+    best = max(blocks, key=len)
+    prefix = prefix.strip()
+    return f"{prefix}\n\n{best}".strip() if prefix else best.strip()
+
+
+def strip_json_from_reply(reply: str) -> str:
+    """If the model leaked raw JSON, replace or remove it."""
+    text = (reply or "").strip()
+    if not text:
         return text
 
-    prefix = text[: match.start()].strip()
-    # Drop redundant filler before the report
-    filler_markers = ("请稍等", "全面诊断", "我来看看", "好的，")
-    if prefix and not any(m in prefix for m in filler_markers):
-        return f"{prefix}\n\n{formatted}"
-    return formatted
+    inner = extract_passthrough(text)
+    if inner:
+        text = inner
+
+    has_report = _REPORT_MARKER in text or _SCORE_MARKER in text
+    if has_report:
+        text = _strip_json_fences(text)
+        text = _strip_inline_json(text)
+        text = _strip_leading_filler(text)
+        return _dedupe_diagnosis_reports(text)
+
+    formatted = _format_json_diagnosis(text)
+    if formatted:
+        return formatted
+
+    text = _strip_json_fences(text)
+    formatted = _format_json_diagnosis(text)
+    return formatted or text
+
+
+def normalize_structured_reply(reply: str) -> str:
+    """Final cleanup for resume structured replies shown to users."""
+    text = strip_json_from_reply(reply)
+    text = _dedupe_diagnosis_reports(text)
+    text = _strip_leading_filler(text)
+
+    # Drop trailing supervisor-style re-summaries after the formal report
+    if _REPORT_MARKER in text:
+        marker_pos = text.index(_REPORT_MARKER)
+        head = text[:marker_pos].strip()
+        body = text[marker_pos:].strip()
+        if head and len(head) < 120:
+            text = body
+        else:
+            text = f"{head}\n\n{body}".strip() if head else body
+
+    return text.strip()
+
+
+def looks_like_messy_resume_reply(content: str) -> bool:
+    markers = (
+        "```json",
+        '"overall_score"',
+        PASSTHROUGH_START,
+        _REPORT_MARKER,
+        _SCORE_MARKER,
+        "## 简历优化结果",
+        "## 岗位匹配分析",
+    )
+    return any(m in content for m in markers)

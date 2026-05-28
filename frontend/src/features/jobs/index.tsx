@@ -443,7 +443,7 @@ export default function Jobs() {
                 <span className={styles.resultTitle}>
                   {showFavoritesOnly ? '收藏夹' : '搜索结果'}
                 </span>
-                <Badge count={total} showZero overflowCount={9999} style={{ backgroundColor: '#1677ff' }} />
+                <Badge count={showFavoritesOnly ? allJobs.filter(j => favorites.has(j.id)).length : total} showZero overflowCount={9999} style={{ backgroundColor: '#1677ff' }} />
                 <Button
                   size="small"
                   type={showFavoritesOnly ? 'primary' : 'text'}
@@ -551,7 +551,7 @@ export default function Jobs() {
                     <span className={styles.noMore}>
                       {showFavoritesOnly
                         ? `共收藏 ${favorites.size} 个岗位`
-                        : `已展示全部 ${total} 个岗位`}
+                        : `已展示全部 ${allJobs.length} 个岗位`}
                     </span>
                   )}
                 </div>

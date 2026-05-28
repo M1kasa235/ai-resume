@@ -91,7 +91,7 @@ class MemoryRepositoryMixin:
                     ),
                 )
             await conn.commit()
-        self.invalidate_cache(user_id)
+        await self.invalidate_cache(user_id)
 
     async def delete(self, user_id: int, category: str, mem_key: str):
         conn = await self._get_conn()
@@ -105,7 +105,7 @@ class MemoryRepositoryMixin:
                 (user_id, self._normalize_category(category), mem_key),
             )
             await conn.commit()
-        self.invalidate_cache(user_id)
+        await self.invalidate_cache(user_id)
 
     async def _delete_by_key(self, user_id: int, key: str):
         conn = await self._get_conn()
@@ -130,7 +130,7 @@ class MemoryRepositoryMixin:
                     (user_id, key),
                 )
             await conn.commit()
-        self.invalidate_cache(user_id)
+        await self.invalidate_cache(user_id)
 
     async def get_all(self, user_id: int, include_inactive: bool = False) -> list[dict]:
         conn = await self._get_conn()

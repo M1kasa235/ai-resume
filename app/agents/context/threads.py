@@ -2,11 +2,21 @@
 
 from __future__ import annotations
 
+import uuid
+
 
 def build_sub_agent_thread(parent_thread_id: str, role: str, user_id: int) -> str:
     if parent_thread_id:
         return f"{parent_thread_id}:{role}"
     return f"user_{user_id}_{role}"
+
+
+def build_ephemeral_sub_agent_thread(parent_thread_id: str, role: str, user_id: int) -> str:
+    """Fresh thread per structured request — avoids stale dates/diagnoses in checkpoint."""
+    suffix = uuid.uuid4().hex[:8]
+    if parent_thread_id:
+        return f"{parent_thread_id}:{role}:{suffix}"
+    return f"user_{user_id}_{role}:{suffix}"
 
 
 def list_related_threads(parent_thread_id: str, user_id: int) -> list[str]:

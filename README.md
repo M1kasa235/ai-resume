@@ -41,14 +41,19 @@
    │ LLM API  │   │  MySQL 8.0   │   │  ChromaDB     │
    │ DashScope│   │  (业务数据)   │   │  (向量存储)   │
    │ DeepSeek │   └──────────────┘   └──────────────┘
-   │ Tavily   │
-   └──────────┘
+   │ Tavily   │          │
+   └──────────┘          ▼
+                  ┌──────────────┐
+                  │  Redis 7     │  (可选：限流 / 会话缓存 / 记忆缓存)
+                  │  不可用则降级  │
+                  └──────────────┘
 ```
 
-- **前端** React + TypeScript + Vite，Ant Design 组件库，端口 5173
-- **后端** FastAPI 异步服务，端口 8080，SSE 流式推送 Agent 回复
-- **Agent** LangChain `create_agent()`，每个 Agent 独立 checkpointer 会话记忆
-- **数据库** MySQL 存业务数据 (用户/岗位/简历)，SQLite 存 Agent 会话和长期记忆
+- **前端** React + TypeScript + Vite，Ant Design；开发端口 5173，启动时轮询 `/health` 等待后端就绪
+- **后端** FastAPI 异步服务，端口 8080，SSE 流式推送 Agent 回复与编排进度
+- **Agent** LangGraph + `create_agent()`，Supervisor 编排；**共享** `AsyncSqliteSaver` 会话 Checkpoint
+- **数据库** MySQL 存业务数据；SQLite 存 Agent Checkpoint 与长期记忆事件
+- **Redis**（可选）连接失败时自动降级为进程内限流与无缓存模式，不影响核心功能
 - **向量库** ChromaDB 存文档分块向量，BM25 + 向量混合检索
 
 ## 为什么选择 Offer Pilot？
@@ -88,7 +93,7 @@
     └───────────────┘  └─────────┘  └─────────────────┘  └────────┘
 ```
 
-每个 Agent 拥有独立的 checkpointer 会话记忆，Supervisor 智能路由并支持跨领域并行调用（`both_agents_tool`）。
+所有 Agent **共享**同一 `AsyncSqliteSaver` Checkpointer；Supervisor 智能路由并支持跨领域并行调用（`both_agents_tool`）。编排过程通过 SSE 推送 `progress` 事件，前端 `StreamProcess` 组件展示子任务进度。
 
 <!-- 预留：AI 顾问对话截图 -->
 <!-- ![AI 顾问对话](./docs/screenshots/ai-advisor.png) -->
@@ -180,7 +185,9 @@
 |------|------|------|
 | Python | 3.10+ | 后端运行环境 |
 | MySQL | 8.0+ | 业务数据存储 |
+| Redis | 7+ | 可选：限流与会话/记忆缓存（推荐 Docker 一并启动） |
 | Node.js | 18+ | 前端构建 |
+| Docker | 20+ | 可选：Compose 一键编排全栈 |
 | [uv](https://docs.astral.sh/uv/) | 最新 | Python 包管理 (推荐) |
 
 ### 获取 API Key
@@ -217,6 +224,7 @@ MYSQL_PASSWORD=你的数据库密码
 SECRET_KEY=随机字符串
 DASHSCOPE_API_KEY=sk-xxxxxxxxxxxxx
 TAVILY_API_KEY=tvly-xxxxxxxxxxxxx
+REDIS_URL=redis://localhost:6379/0
 ```
 
 ```bash
@@ -235,7 +243,7 @@ python run.py
 ```bash
 # 健康检查
 curl http://localhost:8080/health
-# → {"status":"ok","version":"1.0.0"}
+# → {"status":"ok","version":"1.0.0","checkpointer":"AsyncSqliteSaver","redis":"connected"}
 
 # 查看 API 文档
 open http://localhost:8080/docs
@@ -259,38 +267,75 @@ npm run dev
 
 访问 http://localhost:5173 → 注册账号 → 上传简历 → 开始使用 AI 求职顾问。
 
-### Docker 一键部署
+### Docker Compose 一键部署（推荐）
+
+项目根目录提供 `docker-compose.yml`，可编排 **MySQL + Redis + 后端**；前端开发服务可选。
+
+```bash
+# 1. 配置环境变量
+cp .env.example .env
+# 编辑 .env：MYSQL_PASSWORD、SECRET_KEY、DASHSCOPE_API_KEY、TAVILY_API_KEY
+
+# 2. 仅启动依赖（本地跑 python run.py 时）
+docker compose up -d mysql redis
+
+# 3. 启动后端容器（连 compose 内 mysql/redis）
+docker compose up -d backend
+
+# 4. 可选：连同前端开发容器
+docker compose --profile dev up -d
+
+# 查看日志
+docker compose logs -f backend
+```
+
+Compose 默认映射：
+
+| 服务 | 宿主机端口 | 说明 |
+|------|-----------|------|
+| MySQL | 3307 → 3306 | 避免与本地 MySQL 冲突 |
+| Redis | 6379 | 限流 / 缓存；连不上时后端自动降级 |
+| Backend | 8080 | FastAPI |
+| Frontend (dev profile) | 5173 | Vite 热更新 |
+
+容器内后端请将 `.env` 中 `MYSQL_HOST=mysql`、`REDIS_URL=redis://redis:6379/0`（Compose 已注入部分变量）。
+
+### 单容器后端镜像
 
 ```bash
 docker build -t offer-pilot .
-docker run -d \
-  --name offer-pilot \
-  -p 8080:8080 \
-  --env-file .env \
-  offer-pilot
-
-# 查看日志
-docker logs -f offer-pilot
+docker run -d --name offer-pilot -p 8080:8080 --env-file .env offer-pilot
 ```
 
-> Docker 部署不含 MySQL，需要单独配置 MySQL 并在 `.env` 中指定 `MYSQL_HOST`。
+> 单容器镜像不含 MySQL/Redis，需自行提供并在 `.env` 中配置连接地址。
+
+### Redis（单实例、可选）
+
+| 能力 | 配置 | 行为 |
+|------|------|------|
+| 分布式限流 | `REDIS_RATE_LIMIT_ENABLED=true` | Redis 不可用时回退内存限流 |
+| 对话历史缓存 | `REDIS_SESSION_CACHE_TTL` | 减轻 Checkpoint 读取 |
+| 记忆上下文缓存 | `REDIS_MEMORY_CACHE_TTL` | 跨请求复用组装好的记忆文本 |
+
+不启动 Redis 也可正常运行；生产环境建议 `docker compose up -d redis` 以获得稳定限流与缓存。
 
 ## 项目结构
 
 ```
 ├── app/
 │   ├── agents/                # 多智能体系统
-│   │   ├── supervisor.py      #   主管 Agent — 路由编排 + 降级容错
-│   │   ├── agent.py           #   求职顾问 Agent — 搜索/推荐/资讯
-│   │   ├── resume_agent.py    #   简历专家 Agent — 诊断/优化/匹配
-│   │   ├── interview_agent.py #   面试官 Agent — 模拟面试
-│   │   ├── memory_agent.py    #   记忆管家 Agent — 自主记忆管理
-│   │   ├── memory.py          #   记忆存储服务 — CRUD/衰减/缓存
-│   │   ├── pre_process.py     #   预处理 — 意图分类/上下文注入/历史压缩
-│   │   ├── registry.py        #   Agent 统一注册中心
-│   │   ├── trace.py           #   结构化调用追踪
-│   │   ├── config.py          #   共享配置 (checkpointer/middleware)
-│   │   └── tools/             #   Agent 工具集
+│   │   ├── facade/            #   API 层统一入口 (chat / interview)
+│   │   ├── factories/           #   Agent 工厂 + 角色注册
+│   │   ├── orchestration/       #   Supervisor 编排与 SSE 流式
+│   │   ├── context/             #   上下文组装 / 意图 / 预算
+│   │   ├── memory/              #   长期记忆 (事件队列 + 检索)
+│   │   ├── session/             #   会话历史 / checkpoint / 生命周期
+│   │   ├── common/              #   协议常量 / 进度文案 / 流式工具
+│   │   ├── prompts/             #   各 Agent 系统提示词
+│   │   ├── tools/               #   LangChain 工具集
+│   │   ├── registry.py          #   Agent 缓存与角色分发
+│   │   ├── config.py            #   checkpointer / middleware
+│   │   └── trace.py             #   结构化调用追踪
 │   ├── api/v1/                # REST API
 │   │   ├── agent_chat.py      #   统一对话入口 (SSE 流式)
 │   │   ├── interview.py       #   AI 面试 API
@@ -307,7 +352,7 @@ docker logs -f offer-pilot
 │   ├── core/                  # 核心配置/安全/LLM
 │   ├── models/                # SQLAlchemy 数据模型
 │   ├── schemas/               # Pydantic Schema
-│   └── services/              # 业务逻辑层
+│   └── services/              # 业务逻辑层 (含 job_lookup 岗位查询)
 ├── frontend/                  # React 前端
 │   └── src/features/
 │       ├── aiAdvisor/         #   AI 求职顾问页
@@ -317,9 +362,18 @@ docker logs -f offer-pilot
 │       ├── jobs/              #   岗位列表/详情
 │       └── ...
 ├── alembic/                   # 数据库迁移
+├── docker-compose.yml         # MySQL + Redis + backend (+ 可选 frontend)
+├── db/mysql-init/             # MySQL 初始化脚本
 ├── Dockerfile                 # 多阶段构建
 ├── pyproject.toml             # 项目元数据 + 依赖
-└── requirements.txt           # Pip 依赖
+└── requirements.txt           # Pip 依赖（含 redis>=5.0）
+```
+
+### 运行测试
+
+```bash
+# 后端单元测试（默认关闭 Redis 限流，使用内存实现）
+pytest app/tests -q
 ```
 
 ## Agent 工具矩阵
@@ -368,6 +422,10 @@ docker logs -f offer-pilot
 | `MYSQL_USER` | 否 | MySQL 用户名 |
 | `MYSQL_PASSWORD` | **是** | MySQL 密码 |
 | `MYSQL_DB` | 否 | 数据库名 |
+| `REDIS_URL` | 否 | Redis 连接串 (默认 `redis://localhost:6379/0`) |
+| `REDIS_RATE_LIMIT_ENABLED` | 否 | 是否用 Redis 限流 (默认 true) |
+| `REDIS_SESSION_CACHE_TTL` | 否 | 对话历史缓存秒数 (默认 300) |
+| `REDIS_MEMORY_CACHE_TTL` | 否 | 记忆上下文缓存秒数 (默认 600) |
 | `SECRET_KEY` | **是** | JWT 签名密钥 |
 | `DASHSCOPE_API_KEY` | **是** | 阿里百炼 API Key |
 | `DEEPSEEK_API_KEY` | 否 | DeepSeek API Key (备选) |
@@ -422,6 +480,17 @@ MySQL 密码未配置。确保 `.env` 中 `MYSQL_PASSWORD` 不为空。
 
 1. 确认后端已启动: `curl http://localhost:8080/health`
 2. 确认 `CORS_ORIGINS` 包含前端地址 `http://localhost:5173`
+
+### 前端一直显示「等待后端启动」
+
+开发模式下 `BackendStartupGuard` 会轮询 `/health`。请确认：
+
+1. 后端已监听 8080，且 Vite 代理指向正确（`vite.config.ts` → `/api` 与 `/health`）
+2. `curl http://localhost:5173/health` 经代理返回 200
+
+### Redis 显示 unavailable
+
+不影响核心对话与 CRUD。若需限流/缓存：启动 Redis 并检查 `REDIS_URL`；日志中会提示 `Redis unavailable — falling back to in-memory`。
 
 ### 记忆功能不生效
 

@@ -7,6 +7,7 @@ import type { ChatMessage } from '@/types/api';
 import SessionList from './components/SessionList';
 import ChatArea from './components/ChatArea';
 import MessageInput from './components/MessageInput';
+import type { StreamStep } from './components/StreamProcess';
 import styles from './Advisor.module.scss';
 
 interface Session {
@@ -71,8 +72,10 @@ export default function AIAdvisor() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
+  const [streamSteps, setStreamSteps] = useState<StreamStep[]>([]);
   const [webSearchEnabled, setWebSearchEnabled] = useState(loadWebSearchEnabled);
   const streamingRef = useRef('');
+  const stepCounterRef = useRef(0);
 
   // 初始化：如果没有会话，自动创建一个
   useEffect(() => {
@@ -105,13 +108,20 @@ export default function AIAdvisor() {
   }, [sessions]);
 
   const handleDeleteSession = useCallback(
-    (id: string) => {
+    async (id: string) => {
+      try {
+        await advisorApi.clearMessages(id);
+      } catch {
+        antMessage.warning('服务端会话清理失败，本地已移除');
+      }
+
       const updated = sessions.filter((s) => s.id !== id);
       setSessions(updated);
       saveSessions(updated);
       if (activeThreadId === id) {
         const nextId = updated[0]?.id || null;
         setActiveThreadId(nextId);
+        setMessages([]);
       }
     },
     [sessions, activeThreadId],
@@ -142,7 +152,9 @@ export default function AIAdvisor() {
       setMessages((prev) => [...prev, userMsg]);
       setStreaming(true);
       setStreamingContent('');
+      setStreamSteps([]);
       streamingRef.current = '';
+      stepCounterRef.current = 0;
 
       await advisorApi.chatStream(
         {
@@ -151,13 +163,28 @@ export default function AIAdvisor() {
           thread_id: activeThreadId,
           web_search_enabled: webSearchEnabled,
         },
-        (chunk) => {
-          streamingRef.current += chunk;
+        (statusMessage, step) => {
+          setStreamSteps((prev) => {
+            const completed = prev.map((item) => ({ ...item, done: true }));
+            return [
+              ...completed,
+              {
+                id: `${step || 'step'}-${stepCounterRef.current++}`,
+                message: statusMessage,
+                done: false,
+              },
+            ];
+          });
+        },
+        (token) => {
+          setStreamSteps((prev) => prev.map((item) => ({ ...item, done: true })));
+          streamingRef.current += token;
           setStreamingContent(streamingRef.current);
         },
         () => {
           setStreaming(false);
           setStreamingContent('');
+          setStreamSteps([]);
           const finalContent = streamingRef.current;
           streamingRef.current = '';
           setMessages((prev) => [
@@ -167,6 +194,7 @@ export default function AIAdvisor() {
         },
         () => {
           setStreaming(false);
+          setStreamSteps([]);
           antMessage.error('发送失败，请重试');
         },
       );
@@ -189,7 +217,12 @@ export default function AIAdvisor() {
         onDelete={handleDeleteSession}
       />
       <div className={styles.main}>
-        <ChatArea messages={messages} streaming={streaming} streamingContent={streamingContent} />
+        <ChatArea
+          messages={messages}
+          streaming={streaming}
+          streamingContent={streamingContent}
+          streamSteps={streamSteps}
+        />
         <MessageInput
           onSend={handleSend}
           disabled={!activeThreadId || streaming}

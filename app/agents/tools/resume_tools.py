@@ -1,9 +1,10 @@
 """简历相关工具 — 包装 RAG 操作为 agent 可调用的工具"""
 
 import logging
+
 from langchain_core.tools import tool
-from app.rag import get_rag_service
-from app.core.context import require_current_user_id
+
+from app.services.job_lookup import MSG_JOB_NOT_FOUND, fetch_job, job_info_from_model
 from app.agents.tools.resume_formatters import (
     format_diagnosis_report,
     format_match_report,
@@ -11,10 +12,22 @@ from app.agents.tools.resume_formatters import (
     format_polish_report,
     format_query_report,
 )
+from app.core.context import require_current_user_id
+from app.rag import get_rag_service
 
 logger = logging.getLogger(__name__)
 
 
+async def _run_rag(coro, formatter):
+    """Run a RAG call and route exceptions through formatters."""
+    try:
+        result = await coro
+        if isinstance(result, dict):
+            return formatter(result)
+        return formatter({"error": "工具返回格式异常，请稍后重试"})
+    except Exception as exc:
+        logger.warning("resume tool failed", exc_info=True)
+        return formatter({"error": str(exc)})
 @tool
 async def query_resume(question: str) -> str:
     """基于简历内容回答问题。用于查询简历中的具体事实信息。
@@ -28,8 +41,11 @@ async def query_resume(question: str) -> str:
 - 要评分/分析/建议 → 用 diagnose_resume
 - 要针对岗位改简历 → 用 optimize_for_job
 - 要看匹配度 → 用 match_resume_to_job"""
-    result = await get_rag_service().query(require_current_user_id(), question)
-    return format_query_report(result)
+    uid = require_current_user_id()
+    return await _run_rag(
+        get_rag_service().query(uid, question),
+        format_query_report,
+    )
 
 
 @tool
@@ -42,8 +58,11 @@ async def diagnose_resume() -> str:
 - "简历哪里需要改进"
 
 注意：本工具做的是简历本身质量的诊断，不涉及特定岗位的匹配度。"""
-    result = await get_rag_service().diagnose(require_current_user_id())
-    return format_diagnosis_report(result)
+    uid = require_current_user_id()
+    return await _run_rag(
+        get_rag_service().diagnose(uid),
+        format_diagnosis_report,
+    )
 
 
 @tool
@@ -54,51 +73,39 @@ async def optimize_for_job(job_id: int) -> str:
 - "针对这个XX岗位帮我改简历"
 - "帮我把简历改成适合投XX公司的"
 
-注意：需要提供 job_id，先用 search_jobs 找到目标岗位再调用本工具。"""
-    from sqlalchemy import select
-    from app.db.session import AsyncSessionLocal
-    from app.models.job import Job
+前置条件：job_id 必须来自 search_jobs / get_job_recommendations 返回的 [id=数字]。
+建议先 get_job(job_id) 确认岗位后再调用本工具。"""
+    job = await fetch_job(job_id)
+    if not job or not job.is_active:
+        return MSG_JOB_NOT_FOUND
 
-    async with AsyncSessionLocal() as session:
-        stmt = select(Job).where(Job.id == job_id)
-        result = await session.execute(stmt)
-        job = result.scalar_one_or_none()
-        if not job:
-            return "岗位不存在"
-
-    job_info = {
-        "company_name": job.company_name,
-        "title": job.title,
-        "description": job.description or "",
-        "requirements": job.requirements or "",
-    }
-    result = await get_rag_service().optimize_for_job(require_current_user_id(), job_info)
-    return format_optimize_report(result)
+    uid = require_current_user_id()
+    return await _run_rag(
+        get_rag_service().optimize_for_job(uid, job_info_from_model(job)),
+        format_optimize_report,
+    )
 
 
 @tool
 async def match_resume_to_job(job_id: int) -> str:
-    """分析简历与目标岗位的匹配度，返回各维度评分（技能/经验/学历等）、整体匹配分、差距分析和投递建议。
+    """分析简历与目标岗位的匹配度，返回各维度评分、整体匹配分、差距分析和投递建议。
 
 适用场景：
 - "我和这个岗位匹配吗？" / "这个岗位适合我吗？"
 - "我投这个岗位有戏吗？"
 - "对比一下我和这个岗位的差距"
 
-注意：需要提供 job_id，先用 search_jobs 找到目标岗位再调用本工具。"""
-    from sqlalchemy import select
-    from app.db.session import AsyncSessionLocal
-    from app.models.job import Job
+前置条件：job_id 必须来自 search_jobs / get_job_recommendations 返回的 [id=数字]。
+建议先 get_job(job_id) 确认岗位后再调用本工具。"""
+    job = await fetch_job(job_id)
+    if not job or not job.is_active:
+        return MSG_JOB_NOT_FOUND
 
-    async with AsyncSessionLocal() as session:
-        stmt = select(Job).where(Job.id == job_id)
-        result = await session.execute(stmt)
-        job = result.scalar_one_or_none()
-        if not job:
-            return "岗位不存在"
-
-    result = await get_rag_service().match_job(require_current_user_id(), job)
-    return format_match_report(result)
+    uid = require_current_user_id()
+    return await _run_rag(
+        get_rag_service().match_job(uid, job),
+        format_match_report,
+    )
 
 
 @tool
@@ -111,7 +118,12 @@ async def polish_section(section: str, content: str) -> str:
 - "帮我优化这段自我评价"
 
 参数：
-- section: 段落类型，如 "项目经历"、"工作经历"、"自我评价"、"技能" 等
-- content: 需要润色的原文内容"""
-    result = await get_rag_service().polish(section, content)
-    return format_polish_report(result)
+- section: 段落类型，如 "项目经历"、"工作经历"、"自我评价"、"技能"
+- content: **必填**，用户提供的待润色原文；不要留空或编造内容"""
+    if not (content or "").strip():
+        return "润色失败：请提供需要润色的原文 content（可直接粘贴简历段落）。"
+
+    return await _run_rag(
+        get_rag_service().polish(section, content),
+        format_polish_report,
+    )

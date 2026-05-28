@@ -186,13 +186,13 @@ class MemoryRetrievalMixin:
     async def format_context(self, user_id: int, query: str = "") -> str:
         """兼容旧接口：返回注入字符串。"""
         if not query:
-            cached = self.get_cached_context(user_id)
+            cached = await self.get_cached_context(user_id)
             if cached is not None:
                 return cached
         result = await self.retrieve_for_injection(user_id, query=query)
         text = result.get("text", "")
         if text and not query:
-            self.set_cached_context(user_id, text)
+            await self.set_cached_context(user_id, text)
         return text
 
     

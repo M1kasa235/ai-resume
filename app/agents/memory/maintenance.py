@@ -43,7 +43,7 @@ class MemoryMaintenanceMixin:
             await conn.commit()
         if archived:
             logger.info("记忆整合完成: user=%s archived=%s", user_id, archived)
-            self.invalidate_cache(user_id)
+            await self.invalidate_cache(user_id)
 
     async def decay(self, user_id: int):
         conn = await self._get_conn()
@@ -82,7 +82,7 @@ class MemoryMaintenanceMixin:
 
         if total:
             logger.info("memory decay: user=%s expired=%s", user_id, total)
-            self.invalidate_cache(user_id)
+            await self.invalidate_cache(user_id)
 
     async def decay_all(self):
         conn = await self._get_conn()

@@ -9,6 +9,7 @@ from pathlib import Path
 import aiosqlite
 
 from app.agents.memory.constants import DECAY_DAYS, VALID_CATEGORIES
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -37,17 +38,51 @@ class MemoryStoreBase:
 
     # -------------------------- 生命周期 / schema --------------------------
 
+    # ── Redis-backed context cache (with in-process dict fallback) ──
+
     @classmethod
-    def invalidate_cache(cls, user_id: int):
+    async def invalidate_cache(cls, user_id: int):
         cls._context_cache.pop(user_id, None)
+        try:
+            from app.core.redis import get_redis
+
+            r = get_redis()
+            if r is not None:
+                await r.delete(f"memory:profile:{user_id}")
+        except Exception:
+            pass
 
     @classmethod
-    def get_cached_context(cls, user_id: int) -> str | None:
-        return cls._context_cache.get(user_id)
+    async def get_cached_context(cls, user_id: int) -> str | None:
+        # local hit
+        local = cls._context_cache.get(user_id)
+        if local is not None:
+            return local
+        # try Redis
+        try:
+            from app.core.redis import get_redis
+
+            r = get_redis()
+            if r is not None:
+                data = await r.get(f"memory:profile:{user_id}")
+                if data:
+                    cls._context_cache[user_id] = data
+                    return data
+        except Exception:
+            pass
+        return None
 
     @classmethod
-    def set_cached_context(cls, user_id: int, ctx: str):
+    async def set_cached_context(cls, user_id: int, ctx: str):
         cls._context_cache[user_id] = ctx
+        try:
+            from app.core.redis import get_redis
+
+            r = get_redis()
+            if r is not None:
+                await r.setex(f"memory:profile:{user_id}", settings.REDIS_MEMORY_CACHE_TTL, ctx)
+        except Exception:
+            pass
 
     async def _get_conn(self) -> aiosqlite.Connection:
         if self._conn is not None:
@@ -152,7 +187,32 @@ class MemoryStoreBase:
             "CREATE INDEX IF NOT EXISTS idx_memory_events_status "
             "ON memory_events(status, retry_count, created_at)"
         )
+        await conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS memory_thread_counters (
+                thread_id   TEXT PRIMARY KEY,
+                round_count INTEGER DEFAULT 0,
+                updated_at  TEXT DEFAULT (datetime('now','localtime'))
+            )
+            """
+        )
         await conn.commit()
+
+    async def close(self):
+        """Close the SQLite connection (app shutdown)."""
+        if self._conn is not None:
+            await self._conn.close()
+            self._conn = None
+
+    @classmethod
+    async def shutdown(cls):
+        """Release singleton connection and reset instance."""
+        inst = cls._instance
+        if inst is not None:
+            await inst.close()
+            inst._initialized = False
+            cls._instance = None
+        cls._context_cache.clear()
 
     # -------------------------- 基础方法 --------------------------
 

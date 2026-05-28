@@ -87,6 +87,16 @@ async def get_current_admin_user(
     return current_user
 
 
+async def enforce_memory_llm_quota(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """Per-user rate limit for memory endpoints that invoke LLM."""
+    from app.core.limiter import check_memory_llm_quota
+
+    await check_memory_llm_quota(current_user.id)
+    return current_user
+
+
 async def inject_request_context(
     request: Request,
     current_user: User = Depends(get_current_user),

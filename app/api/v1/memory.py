@@ -3,8 +3,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from app.api.deps import get_current_user, inject_request_context
+from app.api.deps import enforce_memory_llm_quota, get_current_user, inject_request_context
 from app.models.user import User
+from app.core.config import settings
 from app.core.llm import get_chat_model
 from app.core.request_context import RequestContext
 from app.agents.memory import MemoryService
@@ -13,10 +14,10 @@ router = APIRouter(prefix="/memory", tags=["长期记忆"])
 
 
 class ExtractRequest(BaseModel):
-    transcript: str = Field(..., description="对话文本或摘要")
-    source: str = Field(default="manual", description="来源标记")
-    thread_id: str = Field(default="manual", description="逻辑线程标识")
-    event_type: str = Field(default="manual_extract", description="事件类型")
+    transcript: str = Field(..., min_length=1, max_length=10000, description="对话文本或摘要")
+    source: str = Field(default="manual", max_length=64, description="来源标记")
+    thread_id: str = Field(default="manual", max_length=128, description="逻辑线程标识")
+    event_type: str = Field(default="manual_extract", max_length=64, description="事件类型")
     process_now: bool = Field(default=True, description="是否立即处理事件")
 
 
@@ -44,7 +45,7 @@ async def list_memories(current_user: User = Depends(get_current_user)):
 @router.post("/extract")
 async def extract_memories(
     body: ExtractRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(enforce_memory_llm_quota),
     _ctx: RequestContext = Depends(inject_request_context),
 ):
     """手动触发记忆提取（统一走事件队列）。"""
@@ -140,6 +141,9 @@ async def retry_memory_event(
     if not body.process_now:
         return {"status": "requeued", "event": event}
 
+    from app.core.limiter import check_memory_llm_quota
+
+    await check_memory_llm_quota(current_user.id)
     llm = get_chat_model()
     result = await svc.process_event(event_id, llm=llm)
     return {"status": "processed", "event_id": event_id, "result": result}
@@ -157,8 +161,12 @@ async def retry_dead_letter_events(
 
     processed = 0
     if body.process_now and requeued > 0:
+        from app.core.limiter import check_memory_llm_quota
+
+        await check_memory_llm_quota(current_user.id)
         llm = get_chat_model()
-        processed = await svc.process_pending_events(llm=llm, batch_size=requeued, user_id=current_user.id)
+        batch = min(requeued, settings.MEMORY_LLM_MAX_BATCH_SIZE)
+        processed = await svc.process_pending_events(llm=llm, batch_size=batch, user_id=current_user.id)
 
     return {
         "status": "done",
@@ -171,22 +179,23 @@ async def retry_dead_letter_events(
 async def process_pending_memory_events(
     batch_size: int = Query(default=20, ge=1, le=200),
     max_retries: int = Query(default=3, ge=1, le=20),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(enforce_memory_llm_quota),
     _ctx: RequestContext = Depends(inject_request_context),
 ):
     """手动触发一次 pending/failed 事件消费。"""
     svc = MemoryService()
     llm = get_chat_model()
+    effective_batch = min(batch_size, settings.MEMORY_LLM_MAX_BATCH_SIZE)
     processed = await svc.process_pending_events(
         llm=llm,
-        batch_size=batch_size,
+        batch_size=effective_batch,
         max_retries=max_retries,
         user_id=current_user.id,
     )
     return {
         "status": "done",
         "processed": processed,
-        "batch_size": batch_size,
+        "batch_size": effective_batch,
         "max_retries": max_retries,
     }
 
@@ -200,19 +209,19 @@ async def delete_memory(
     """删除单条记忆"""
     svc = MemoryService()
     await svc.delete(current_user.id, category, mem_key)
-    MemoryService.invalidate_cache(current_user.id)
+    await MemoryService.invalidate_cache(current_user.id)
     return {"status": "deleted"}
 
 
 @router.post("/consolidate")
 async def consolidate_memories(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(enforce_memory_llm_quota),
     _ctx: RequestContext = Depends(inject_request_context),
 ):
     """手动触发记忆整合（合并同类项）"""
     svc = MemoryService()
     llm = get_chat_model()
     await svc.consolidate(current_user.id, llm)
-    MemoryService.invalidate_cache(current_user.id)
+    await MemoryService.invalidate_cache(current_user.id)
     count = await svc.count(current_user.id)
     return {"status": "done", "count": count}

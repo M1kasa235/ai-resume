@@ -40,7 +40,7 @@ class ContextBundle:
             elif block.kind == "memory":
                 parts.append(block.content)
             elif block.kind == "history":
-                parts.append(f"[对话历史摘要] {block.content}")
+                parts.append(f"[对话历史摘要（日期/结论可能已过期，请以系统上下文为准）] {block.content}")
             elif block.kind == "user":
                 parts.append(block.content)
         return "\n\n".join(parts)

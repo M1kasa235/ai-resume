@@ -5,6 +5,7 @@ import logging
 
 from langchain_core.language_models import BaseChatModel
 
+from app.agents.context.temporal import TEMPORAL_REASONING_RULES, reference_date
 from app.rag.core.utils import parse_json_from_llm, llm_response_text
 
 logger = logging.getLogger(__name__)
@@ -31,7 +32,10 @@ class ResumeDiagnoser:
 
         resume_text = "\n".join(d.page_content for d in docs)
 
+        today = reference_date()
         prompt = (
+            f"{TEMPORAL_REASONING_RULES}\n\n"
+            f"参考日期（今天）：{today}\n"
             "你是一位资深HR。分析以下简历，输出诊断报告。\n\n"
             "简历内容：\n{resume_text}\n\n"
             "按 JSON 格式输出：\n"

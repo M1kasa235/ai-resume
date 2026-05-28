@@ -1,11 +1,14 @@
 # app/services/dashboard_service.py
 from datetime import datetime, timedelta
-from typing import List, Dict, Optional, Any, Callable
+from typing import List, Dict, Optional, Any
 from sqlalchemy import func, select, case, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
-from app.models.job import Job
+from app.models.job import Job, UserFavoriteJob
+from app.models.application import Application
+from app.models.interview import AIInterview
+from app.models.question import UserPractice
 
 
 class DashboardService:
@@ -63,8 +66,6 @@ class DashboardService:
 
     async def _get_statistics(self, user_id: int) -> Dict:
         """获取用户统计数据"""
-        from app.models.job import UserFavoriteJob
-
         total_applications = await self._count_applications(user_id)
         total_ai_interviews = await self._count_ai_interviews(user_id)
         total_practices = await self._count_practices(user_id)
@@ -87,43 +88,30 @@ class DashboardService:
 
     async def _count_applications(self, user_id: int) -> int:
         """统计投递数量"""
-        try:
-            from app.models import Application
-            stmt = select(func.count()).select_from(Application).where(
-                Application.user_id == user_id
-            )
-            result = await self.db.execute(stmt)
-            return result.scalar() or 0
-        except (ImportError, AttributeError):
-            return 0
+        stmt = select(func.count()).select_from(Application).where(
+            Application.user_id == user_id
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar() or 0
 
     async def _count_ai_interviews(self, user_id: int) -> int:
         """统计AI面试数量"""
-        try:
-            from app.models import AIInterview
-            stmt = select(func.count()).select_from(AIInterview).where(
-                AIInterview.user_id == user_id
-            )
-            result = await self.db.execute(stmt)
-            return result.scalar() or 0
-        except (ImportError, AttributeError):
-            return 0
+        stmt = select(func.count()).select_from(AIInterview).where(
+            AIInterview.user_id == user_id
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar() or 0
 
     async def _count_practices(self, user_id: int) -> int:
         """统计刷题数量"""
-        try:
-            from app.models import UserPractice
-            stmt = select(func.count()).select_from(UserPractice).where(
-                UserPractice.user_id == user_id
-            )
-            result = await self.db.execute(stmt)
-            return result.scalar() or 0
-        except (ImportError, AttributeError):
-            return 0
+        stmt = select(func.count()).select_from(UserPractice).where(
+            UserPractice.user_id == user_id
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar() or 0
 
     async def _count_favorite_jobs(self, user_id: int) -> int:
         """统计收藏岗位数量"""
-        from app.models.job import UserFavoriteJob
         stmt = select(func.count()).select_from(UserFavoriteJob).where(
             UserFavoriteJob.user_id == user_id
         )
@@ -132,56 +120,44 @@ class DashboardService:
 
     async def _calculate_accuracy(self, user_id: int) -> float:
         """计算正确率"""
-        try:
-            from app.models import UserPractice
-            stmt = select(
-                func.count(case((UserPractice.status == 'correct', 1))),
-                func.count()
-            ).where(UserPractice.user_id == user_id)
-            
-            result = await self.db.execute(stmt)
-            correct, total = result.one()
-            
-            if total == 0:
-                return 0.0
-            return (correct / total) * 100
-        except (ImportError, AttributeError):
+        stmt = select(
+            func.count(case((UserPractice.status == 'correct', 1))),
+            func.count()
+        ).where(UserPractice.user_id == user_id)
+
+        result = await self.db.execute(stmt)
+        correct, total = result.one()
+
+        if total == 0:
             return 0.0
+        return (correct / total) * 100
 
     async def _calculate_resume_completeness(self, user_id: int) -> int:
         """计算简历完善度"""
-        try:
-            from app.models import User
-            stmt = select(User).where(User.id == user_id)
-            result = await self.db.execute(stmt)
-            user = result.scalar_one_or_none()
-            if not user:
-                return 0
-
-            fields = [
-                bool(user.real_name),
-                bool(user.current_city),
-                bool(user.target_city),
-                bool(user.education),
-                bool(user.work_years is not None),
-            ]
-            filled = sum(fields)
-            return int((filled / len(fields)) * 100)
-        except (ImportError, AttributeError):
+        stmt = select(User).where(User.id == user_id)
+        result = await self.db.execute(stmt)
+        user = result.scalar_one_or_none()
+        if not user:
             return 0
+
+        fields = [
+            bool(user.real_name),
+            bool(user.current_city),
+            bool(user.target_city),
+            bool(user.education),
+            bool(user.work_years is not None),
+        ]
+        filled = sum(fields)
+        return int((filled / len(fields)) * 100)
 
     async def _count_completed_interviews(self, user_id: int) -> int:
         """统计完成的AI面试数量"""
-        try:
-            from app.models import AIInterview
-            stmt = select(func.count()).select_from(AIInterview).where(
-                AIInterview.user_id == user_id,
-                AIInterview.status == 'completed'
-            )
-            result = await self.db.execute(stmt)
-            return result.scalar() or 0
-        except (ImportError, AttributeError):
-            return 0
+        stmt = select(func.count()).select_from(AIInterview).where(
+            AIInterview.user_id == user_id,
+            AIInterview.status == 'completed'
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar() or 0
 
     async def get_growth_curve(self, user_id: int, days: int = 30) -> Dict:
         """
@@ -237,93 +213,74 @@ class DashboardService:
             "summary": summary
         }
 
-    async def _get_daily_applications(self, user_id: int, start_date: datetime, end_date: datetime) -> dict[Any,
-    Callable[..., int]] | dict[Any, Any]:
+    async def _get_daily_applications(self, user_id: int, start_date: datetime, end_date: datetime) -> dict[str, int]:
         """获取每日投递数"""
-        try:
-            from app.models import Application
-            stmt = select(
-                func.date(Application.applied_at).label('date'),
-                func.count().label('count')
-            ).where(
-                Application.user_id == user_id,
-                Application.applied_at >= start_date,
-                Application.applied_at <= end_date
-            ).group_by(func.date(Application.applied_at))
-            
-            result = await self.db.execute(stmt)
-            rows = result.all()
-            return {row.date.strftime('%Y-%m-%d'): row.count for row in rows}
-        except (ImportError, AttributeError):
-            return {}
+        stmt = select(
+            func.date(Application.applied_at).label('date'),
+            func.count().label('count')
+        ).where(
+            Application.user_id == user_id,
+            Application.applied_at >= start_date,
+            Application.applied_at <= end_date
+        ).group_by(func.date(Application.applied_at))
 
-    async def _get_daily_ai_interviews(self, user_id: int, start_date: datetime, end_date: datetime) -> dict[Any,
-    Callable[..., int]] | dict[Any, Any]:
+        result = await self.db.execute(stmt)
+        rows = result.all()
+        return {row.date.strftime('%Y-%m-%d'): row.count for row in rows}
+
+    async def _get_daily_ai_interviews(self, user_id: int, start_date: datetime, end_date: datetime) -> dict[str, int]:
         """获取每日AI面试数"""
-        try:
-            from app.models import AIInterview
-            stmt = select(
-                func.date(AIInterview.started_at).label('date'),
-                func.count().label('count')
-            ).where(
-                AIInterview.user_id == user_id,
-                AIInterview.started_at >= start_date,
-                AIInterview.started_at <= end_date
-            ).group_by(func.date(AIInterview.started_at))
-            
-            result = await self.db.execute(stmt)
-            rows = result.all()
-            return {row.date.strftime('%Y-%m-%d'): row.count for row in rows}
-        except (ImportError, AttributeError):
-            return {}
+        stmt = select(
+            func.date(AIInterview.started_at).label('date'),
+            func.count().label('count')
+        ).where(
+            AIInterview.user_id == user_id,
+            AIInterview.started_at >= start_date,
+            AIInterview.started_at <= end_date
+        ).group_by(func.date(AIInterview.started_at))
 
-    async def _get_daily_practices(self, user_id: int, start_date: datetime, end_date: datetime) -> dict[Any, Callable[
-        ..., int]] | dict[Any, Any]:
+        result = await self.db.execute(stmt)
+        rows = result.all()
+        return {row.date.strftime('%Y-%m-%d'): row.count for row in rows}
+
+    async def _get_daily_practices(self, user_id: int, start_date: datetime, end_date: datetime) -> dict[str, int]:
         """获取每日刷题数"""
-        try:
-            from app.models import UserPractice
-            stmt = select(
-                func.date(UserPractice.practiced_at).label('date'),
-                func.count().label('count')
-            ).where(
-                UserPractice.user_id == user_id,
-                UserPractice.practiced_at >= start_date,
-                UserPractice.practiced_at <= end_date
-            ).group_by(func.date(UserPractice.practiced_at))
-            
-            result = await self.db.execute(stmt)
-            rows = result.all()
-            return {row.date.strftime('%Y-%m-%d'): row.count for row in rows}
-        except (ImportError, AttributeError):
-            return {}
+        stmt = select(
+            func.date(UserPractice.practiced_at).label('date'),
+            func.count().label('count')
+        ).where(
+            UserPractice.user_id == user_id,
+            UserPractice.practiced_at >= start_date,
+            UserPractice.practiced_at <= end_date
+        ).group_by(func.date(UserPractice.practiced_at))
+
+        result = await self.db.execute(stmt)
+        rows = result.all()
+        return {row.date.strftime('%Y-%m-%d'): row.count for row in rows}
 
     async def _get_daily_accuracy(self, user_id: int, start_date: datetime, end_date: datetime) -> Dict[str, Optional[float]]:
         """获取每日正确率"""
-        try:
-            from app.models import UserPractice
-            stmt = select(
-                func.date(UserPractice.practiced_at).label('date'),
-                func.sum(case((UserPractice.status == 'correct', 1), else_=0)).label('correct'),
-                func.count().label('total')
-            ).where(
-                UserPractice.user_id == user_id,
-                UserPractice.practiced_at >= start_date,
-                UserPractice.practiced_at <= end_date
-            ).group_by(func.date(UserPractice.practiced_at))
-            
-            result = await self.db.execute(stmt)
-            rows = result.all()
-            
-            accuracy_dict = {}
-            for row in rows:
-                if row.total > 0:
-                    accuracy_dict[row.date.strftime('%Y-%m-%d')] = round((row.correct / row.total) * 100, 2)
-                else:
-                    accuracy_dict[row.date.strftime('%Y-%m-%d')] = None
-                    
-            return accuracy_dict
-        except (ImportError, AttributeError):
-            return {}
+        stmt = select(
+            func.date(UserPractice.practiced_at).label('date'),
+            func.sum(case((UserPractice.status == 'correct', 1), else_=0)).label('correct'),
+            func.count().label('total')
+        ).where(
+            UserPractice.user_id == user_id,
+            UserPractice.practiced_at >= start_date,
+            UserPractice.practiced_at <= end_date
+        ).group_by(func.date(UserPractice.practiced_at))
+
+        result = await self.db.execute(stmt)
+        rows = result.all()
+
+        accuracy_dict = {}
+        for row in rows:
+            if row.total > 0:
+                accuracy_dict[row.date.strftime('%Y-%m-%d')] = round((row.correct / row.total) * 100, 2)
+            else:
+                accuracy_dict[row.date.strftime('%Y-%m-%d')] = None
+
+        return accuracy_dict
 
     async def get_activities(self, user_id: int, limit: int = 10) -> List[Dict]:
         """
@@ -362,134 +319,112 @@ class DashboardService:
 
     async def _get_application_activities(self, user_id: int, limit: int) -> List[Dict]:
         """获取投递活动"""
-        try:
-            from app.models import Application
-            from app.models.job import Job
-            
-            stmt = select(Application, Job.title, Job.company_name).join(
-                Job, Application.job_id == Job.id, isouter=True
-            ).where(
-                Application.user_id == user_id
-            ).order_by(
-                desc(Application.created_at)
-            ).limit(limit)
-            
-            result = await self.db.execute(stmt)
-            rows = result.all()
-            
-            activities = []
-            for app, job_title, company_name in rows:
-                display_company = company_name or app.company_name
-                display_title = job_title or app.job_title
-                
-                activities.append({
-                    "type": "application_created",
-                    "title": "投递了新岗位",
-                    "description": f"投递了 {display_company} - {display_title}",
-                    "icon": "send",
-                    "color": "blue",
-                    "created_at": app.created_at
-                })
-            
-            return activities
-        except (ImportError, AttributeError):
-            return []
+        stmt = select(Application, Job.title, Job.company_name).join(
+            Job, Application.job_id == Job.id, isouter=True
+        ).where(
+            Application.user_id == user_id
+        ).order_by(
+            desc(Application.created_at)
+        ).limit(limit)
+
+        result = await self.db.execute(stmt)
+        rows = result.all()
+
+        activities = []
+        for app, job_title, company_name in rows:
+            display_company = company_name or app.company_name
+            display_title = job_title or app.job_title
+
+            activities.append({
+                "type": "application_created",
+                "title": "投递了新岗位",
+                "description": f"投递了 {display_company} - {display_title}",
+                "icon": "send",
+                "color": "blue",
+                "created_at": app.created_at
+            })
+
+        return activities
 
     async def _get_ai_interview_activities(self, user_id: int, limit: int) -> List[Dict]:
         """获取AI面试活动"""
-        try:
-            from app.models import AIInterview
-            
-            stmt = select(AIInterview).where(
-                AIInterview.user_id == user_id
-            ).order_by(
-                desc(AIInterview.started_at)
-            ).limit(limit)
-            
-            result = await self.db.execute(stmt)
-            interviews = result.scalars().all()
-            
-            activities = []
-            for interview in interviews:
-                score_text = f"，得分{interview.overall_score}分" if interview.overall_score else ""
-                activities.append({
-                    "type": "ai_interview_completed",
-                    "title": "完成AI面试",
-                    "description": f"完成了 {interview.job_title or '模拟面试'}{score_text}",
-                    "icon": "robot",
-                    "color": "green",
-                    "created_at": interview.ended_at or interview.started_at
-                })
-            
-            return activities
-        except (ImportError, AttributeError):
-            return []
+        stmt = select(AIInterview).where(
+            AIInterview.user_id == user_id
+        ).order_by(
+            desc(AIInterview.started_at)
+        ).limit(limit)
+
+        result = await self.db.execute(stmt)
+        interviews = result.scalars().all()
+
+        activities = []
+        for interview in interviews:
+            score_text = f"，得分{interview.overall_score}分" if interview.overall_score else ""
+            activities.append({
+                "type": "ai_interview_completed",
+                "title": "完成AI面试",
+                "description": f"完成了 {interview.job_title or '模拟面试'}{score_text}",
+                "icon": "robot",
+                "color": "green",
+                "created_at": interview.ended_at or interview.started_at
+            })
+
+        return activities
 
     async def _get_practice_activities(self, user_id: int, limit: int) -> List[Dict]:
         """获取刷题活动（聚合显示）"""
-        try:
-            from app.models import UserPractice
-            from app.models import Question
-            
-            # 按天聚合刷题记录
-            stmt = select(
-                func.date(UserPractice.practiced_at).label('practice_date'),
-                func.count().label('count'),
-                func.sum(case((UserPractice.status == 'correct', 1), else_=0)).label('correct')
-            ).where(
-                UserPractice.user_id == user_id
-            ).group_by(
-                func.date(UserPractice.practiced_at)
-            ).order_by(
-                desc(func.date(UserPractice.practiced_at))
-            ).limit(limit)
-            
-            result = await self.db.execute(stmt)
-            rows = result.all()
-            
-            activities = []
-            for row in rows:
-                accuracy = round((row.correct / row.count) * 100, 1) if row.count > 0 else 0
-                activities.append({
-                    "type": "practice_session",
-                    "title": "完成刷题练习",
-                    "description": f"刷了{row.count}道题，正确率{accuracy}%",
-                    "icon": "book",
-                    "color": "purple",
-                    "created_at": datetime.combine(row.practice_date, datetime.min.time())
-                })
-            
-            return activities
-        except (ImportError, AttributeError):
-            return []
+        # 按天聚合刷题记录
+        stmt = select(
+            func.date(UserPractice.practiced_at).label('practice_date'),
+            func.count().label('count'),
+            func.sum(case((UserPractice.status == 'correct', 1), else_=0)).label('correct')
+        ).where(
+            UserPractice.user_id == user_id
+        ).group_by(
+            func.date(UserPractice.practiced_at)
+        ).order_by(
+            desc(func.date(UserPractice.practiced_at))
+        ).limit(limit)
+
+        result = await self.db.execute(stmt)
+        rows = result.all()
+
+        activities = []
+        for row in rows:
+            accuracy = round((row.correct / row.count) * 100, 1) if row.count > 0 else 0
+            activities.append({
+                "type": "practice_session",
+                "title": "完成刷题练习",
+                "description": f"刷了{row.count}道题，正确率{accuracy}%",
+                "icon": "book",
+                "color": "purple",
+                "created_at": datetime.combine(row.practice_date, datetime.min.time())
+            })
+
+        return activities
 
     async def _get_favorite_activities(self, user_id: int, limit: int) -> List[Dict]:
         """获取收藏活动"""
-        try:
-            from app.models.job import UserFavoriteJob, Job
-            
-            stmt = select(UserFavoriteJob, Job.title, Job.company_name).join(
-                Job, UserFavoriteJob.job_id == Job.id
-            ).where(
-                UserFavoriteJob.user_id == user_id
-            ).order_by(
-                desc(UserFavoriteJob.created_at)
-            ).limit(limit)
-            
-            result = await self.db.execute(stmt)
-            rows = result.all()
-            
-            activities = []
-            for fav, job_title, company_name in rows:
-                activities.append({
-                    "type": "job_favorited",
-                    "title": "收藏了岗位",
-                    "description": f"收藏了 {company_name} - {job_title}",
-                    "icon": "star",
-                    "color": "yellow",
-                    "created_at": fav.created_at
-                })
-            
-            return activities
-        except (ImportError, AttributeError):
-            return []
+        stmt = select(UserFavoriteJob, Job.title, Job.company_name).join(
+            Job, UserFavoriteJob.job_id == Job.id
+        ).where(
+            UserFavoriteJob.user_id == user_id
+        ).order_by(
+            desc(UserFavoriteJob.created_at)
+        ).limit(limit)
+
+        result = await self.db.execute(stmt)
+        rows = result.all()
+
+        activities = []
+        for fav, job_title, company_name in rows:
+            activities.append({
+                "type": "job_favorited",
+                "title": "收藏了岗位",
+                "description": f"收藏了 {company_name} - {job_title}",
+                "icon": "star",
+                "color": "yellow",
+                "created_at": fav.created_at
+            })
+
+        return activities

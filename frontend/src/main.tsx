@@ -7,7 +7,24 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 
 import App from './App';
+import { BackendStartupGuard } from '@components/BackendStartupGuard';
 import './styles/index.scss';
+
+// 开发环境清理旧 PWA Service Worker，避免 lazy chunk 被缓存导致路由切换失败
+if (import.meta.env.DEV && 'serviceWorker' in navigator) {
+  void navigator.serviceWorker.getRegistrations().then((registrations) => {
+    registrations.forEach((registration) => {
+      void registration.unregister();
+    });
+  });
+  if ('caches' in window) {
+    void caches.keys().then((keys) => {
+      keys.forEach((key) => {
+        void caches.delete(key);
+      });
+    });
+  }
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -32,7 +49,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         }}
       >
         <BrowserRouter>
-          <App />
+          <BackendStartupGuard>
+            <App />
+          </BackendStartupGuard>
         </BrowserRouter>
       </ConfigProvider>
     </QueryClientProvider>

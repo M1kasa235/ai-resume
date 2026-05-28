@@ -19,6 +19,13 @@ class Settings(BaseSettings):
     MYSQL_USER: str = "root"
     MYSQL_PASSWORD: str = ""
     MYSQL_DB: str = "ai_job"
+    TEST_DATABASE_URL: Optional[str] = None
+
+    # Redis 配置
+    REDIS_URL: str = "redis://localhost:6379/0"
+    REDIS_RATE_LIMIT_ENABLED: bool = True
+    REDIS_SESSION_CACHE_TTL: int = 300
+    REDIS_MEMORY_CACHE_TTL: int = 600
 
     # 异步数据库URL
     @property
@@ -42,6 +49,8 @@ class Settings(BaseSettings):
     DASHSCOPE_API_KEY: str = ""
     DEEPSEEK_API_KEY: str = ""
     DEEPSEEK_BASE_URL: str = ""
+    # deepseek-v4 默认开启 thinking；LangChain 工具调用链路无法回传 reasoning_content，会 400
+    DEEPSEEK_THINKING_ENABLED: bool = False
     RAG_EMBEDDING_MODEL: str = "text-embedding-v4"
     RAG_RERANK_MODEL: str = "gte-rerank-v2"
 
@@ -55,6 +64,10 @@ class Settings(BaseSettings):
     MEMORY_EVENT_WORKER_INTERVAL_SECONDS: int = 20
     MEMORY_EVENT_WORKER_BATCH_SIZE: int = 20
     MEMORY_EVENT_MAX_RETRIES: int = 3
+    MEMORY_EVENT_PROCESSING_STALE_MINUTES: int = 5
+    MEMORY_AUTO_TRIGGER_ROUNDS: int = 10
+    MEMORY_LLM_RATE_LIMIT_PER_MINUTE: int = 10
+    MEMORY_LLM_MAX_BATCH_SIZE: int = 20
 
     # 上下文注入预算
     CONTEXT_USE_BUNDLE: bool = True
@@ -64,6 +77,10 @@ class Settings(BaseSettings):
     CONTEXT_HISTORY_MAX_CHARS: int = 400
     CONTEXT_USER_MAX_CHARS: int = 2000
     CONTEXT_STRIP_API_DATE_PREFIX: bool = True
+
+    # LangGraph agent 运行预算（默认 recursion_limit=25 不足以支撑多工具编排）
+    AGENT_RECURSION_LIMIT: int = 60
+    AGENT_TOOL_RUN_LIMIT: int = 15
 
     @field_validator("SECRET_KEY")
     @classmethod

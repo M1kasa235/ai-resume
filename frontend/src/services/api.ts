@@ -351,7 +351,7 @@ export const workbenchApi = {
 
 // ==================== AI求职顾问接口 ====================
 export const advisorApi = {
-  // 流式对话（SSE）
+  // 流式对话（SSE：status / token / done）
   chatStream: async (
     data: {
       message: string;
@@ -359,18 +359,18 @@ export const advisorApi = {
       thread_id: string;
       web_search_enabled?: boolean;
     },
-    onChunk: (text: string) => void,
+    onStatus: (message: string, step?: string) => void,
+    onToken: (text: string) => void,
     onDone: () => void,
     onError: (err: Error) => void,
     signal?: AbortSignal,
   ) => {
     const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
-    // 从 localStorage 直接读取 token（userStore 持久化存储）
     let token: string | null = null;
     try {
       const stored = JSON.parse(localStorage.getItem('user-storage') || '{}');
       token = stored?.state?.token || null;
-    } catch {}
+    } catch { /* ignore */ }
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
@@ -382,16 +382,47 @@ export const advisorApi = {
         signal,
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
       const reader = response.body!.getReader();
       const decoder = new TextDecoder();
+      let buffer = '';
+
       while (true) {
         const { done, value } = await reader.read();
-        if (done) { onDone(); break; }
-        const text = decoder.decode(value, { stream: true });
-        if (text) onChunk(text);
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const payload = JSON.parse(line.slice(6)) as {
+              type: string;
+              content?: string;
+              message?: string;
+              step?: string;
+            };
+            if (payload.type === 'status' && payload.message) {
+              onStatus(payload.message, payload.step);
+            } else if (payload.type === 'token' && payload.content) {
+              onToken(payload.content);
+            } else if (payload.type === 'done') {
+              onDone();
+              return;
+            } else if (payload.type === 'error') {
+              onError(new Error((payload as { message?: string }).message || 'stream error'));
+              return;
+            }
+          } catch {
+            // ignore malformed SSE lines
+          }
+        }
       }
-    } catch (err: any) {
-      if (err.name !== 'AbortError') onError(err);
+      onDone();
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name !== 'AbortError') onError(err);
     }
   },
 

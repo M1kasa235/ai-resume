@@ -2,17 +2,15 @@
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 
-from app.api.deps import get_current_user, get_db
+from app.services.job_lookup import fetch_job, job_info_from_model
+from app.api.deps import get_current_user
 from app.models.user import User
-from app.models.job import Job
 from app.rag import get_rag_service
 from app.schemas.rag import (
-    ResumeDiagnoseResponse,
     OptimizeRequest,
     OptimizeResponse,
+    ResumeDiagnoseResponse,
 )
 
 router = APIRouter(prefix="/resume", tags=["简历优化"])
@@ -31,23 +29,16 @@ async def diagnose_resume(current_user: User = Depends(get_current_user)):
 async def optimize_resume(
     request: OptimizeRequest,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
 ):
     """针对岗位优化简历"""
-    stmt = select(Job).where(Job.id == request.job_id)
-    result = await db.execute(stmt)
-    job = result.scalar_one_or_none()
-    if not job:
+    job = await fetch_job(request.job_id)
+    if not job or not job.is_active:
         raise HTTPException(status_code=404, detail="岗位不存在")
 
-    job_info = {
-        "company_name": job.company_name,
-        "title": job.title,
-        "description": job.description or "",
-        "requirements": job.requirements or "",
-    }
-
-    result = await get_rag_service().optimize_for_job(current_user.id, job_info)
+    result = await get_rag_service().optimize_for_job(
+        current_user.id,
+        job_info_from_model(job),
+    )
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return OptimizeResponse(**result)

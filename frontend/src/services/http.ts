@@ -29,6 +29,9 @@ const instance: AxiosInstance = axios.create({
   timeout: 60000,
 });
 
+const APP_BOOT_TIME = Date.now();
+const STARTUP_GRACE_MS = 30_000;
+
 let isRefreshing = false;
 let refreshSubscribers: ((_: string) => void)[] = [];
 
@@ -128,6 +131,16 @@ instance.interceptors.response.use(
       } finally {
         isRefreshing = false;
       }
+    }
+
+    // 启动宽限期内，网络错误不弹 toast（后端可能仍在初始化）
+    const isStartupNetworkError =
+      !error.response &&
+      Date.now() - APP_BOOT_TIME < STARTUP_GRACE_MS &&
+      (error.code === 'ERR_NETWORK' || error.message === 'Network Error');
+
+    if (isStartupNetworkError) {
+      return Promise.reject(error);
     }
 
     // 处理其他错误

@@ -1,0 +1,114 @@
+# Offer Pilot — Docker Compose 全栈编排
+#
+# 开发模式启动: docker compose up -d
+# 仅启动依赖服务: docker compose up -d mysql redis
+# 查看日志:      docker compose logs -f backend
+# 停止:          docker compose down
+# 停止+清数据:   docker compose down -v
+
+services:
+  # ── MySQL 8.0 ──────────────────────────────────
+  mysql:
+    image: mysql:8.0
+    container_name: offer-pilot-mysql
+    ports:
+      - "3307:3306"  # 宿主机 3307 → 容器 3306（避免与本地 MySQL 冲突）
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD:-mysql80}
+      MYSQL_DATABASE: ${MYSQL_DB:-ai_job}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./db/mysql-init:/docker-entrypoint-initdb.d  # 初始化 SQL 脚本
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_PASSWORD:-mysql80}"]
+      interval: 8s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  # ── Redis 7 ────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: offer-pilot-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  # ── FastAPI 后端 ───────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: offer-pilot-backend
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - SERVER_HOST=0.0.0.0
+    volumes:
+      - chroma_data:/app/db/chroma
+      - checkpoint_data:/app/app/db/agent_sessions
+      - uploads_data:/app/uploads
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  # ── React 前端（开发模式）───────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: offer-pilot-frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - NODE_ENV=development
+      - VITE_API_BASE_URL=http://backend:8080
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - frontend_node_modules:/app/node_modules
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - app-network
+    profiles:
+      - dev
+
+volumes:
+  mysql_data:
+  redis_data:
+  chroma_data:
+  checkpoint_data:
+  uploads_data:
+  frontend_node_modules:
+
+networks:
+  app-network:
+    driver: bridge

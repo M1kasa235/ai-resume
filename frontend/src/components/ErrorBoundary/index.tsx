@@ -11,6 +11,16 @@ interface State {
   hasError: boolean;
   error: Error | null;
   errorInfo: ErrorInfo | null;
+  reloaded: boolean;
+}
+
+function isChunkLoadError(error: Error | null): boolean {
+  const message = error?.message || '';
+  return (
+    message.includes('Failed to fetch dynamically imported module') ||
+    message.includes('Importing a module script failed') ||
+    message.includes('Loading chunk')
+  );
 }
 
 export class ErrorBoundary extends Component<Props, State> {
@@ -20,6 +30,7 @@ export class ErrorBoundary extends Component<Props, State> {
       hasError: false,
       error: null,
       errorInfo: null,
+      reloaded: false,
     };
   }
 
@@ -29,8 +40,14 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
     this.setState({ errorInfo });
-    
+
     console.error('ErrorBoundary caught an error:', error, errorInfo);
+
+    if (isChunkLoadError(error) && !this.state.reloaded) {
+      this.setState({ reloaded: true });
+      window.location.reload();
+      return;
+    }
     
     // Sentry 错误追踪（可选）
     // if (import.meta.env.VITE_SENTRY_DSN) {
@@ -48,6 +65,7 @@ export class ErrorBoundary extends Component<Props, State> {
       hasError: false,
       error: null,
       errorInfo: null,
+      reloaded: false,
     });
   };
 

@@ -1,28 +1,32 @@
 import { useEffect, useRef } from 'react';
-import { Spin, Empty } from 'antd';
+import { Empty } from 'antd';
 
 import type { ChatMessage } from '@/types/api';
 import MessageBubble from './MessageBubble';
+import StreamProcess, { type StreamStep } from './StreamProcess';
 import styles from '../Advisor.module.scss';
 
 interface ChatAreaProps {
   messages: ChatMessage[];
   streaming?: boolean;
   streamingContent?: string;
+  streamSteps?: StreamStep[];
 }
 
 export default function ChatArea({
   messages,
   streaming,
   streamingContent,
+  streamSteps = [],
 }: ChatAreaProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, streamingContent]);
+  }, [messages, streamingContent, streamSteps]);
 
-  const hasContent = messages.length > 0 || (streaming && streamingContent);
+  const hasContent =
+    messages.length > 0 || !!streaming || !!streamingContent || streamSteps.length > 0;
 
   return (
     <div className={styles.chatArea}>
@@ -46,14 +50,11 @@ export default function ChatArea({
           {messages.map((msg, i) => (
             <MessageBubble key={i} role={msg.role} content={msg.content} />
           ))}
+          {streaming && streamSteps.length > 0 && (
+            <StreamProcess steps={streamSteps} streaming={!!streaming} />
+          )}
           {streaming && streamingContent && (
             <MessageBubble role="assistant" content={streamingContent} />
-          )}
-          {streaming && (
-            <div className={styles.streamingIndicator}>
-              <Spin size="small" />
-              <span>AI 正在思考...</span>
-            </div>
           )}
         </>
       )}

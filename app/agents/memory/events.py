@@ -3,7 +3,11 @@
 import hashlib
 import json
 import logging
+from datetime import datetime
 from uuid import uuid4
+
+from app.agents.memory.base import MemoryStoreBase
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -138,7 +142,8 @@ class MemoryEventsMixin:
         if user_id is not None and int(event["user_id"]) != int(user_id):
             return None
         if event.get("status") == "processing":
-            return event
+            if not self._is_event_processing_stale(event):
+                return event
 
         next_retry = 0 if reset_retry_count else int(event.get("retry_count") or 0)
         conn = await self._get_conn()
@@ -190,6 +195,165 @@ class MemoryEventsMixin:
             )
             await conn.commit()
         return len(event_ids)
+
+    @staticmethod
+    def _is_event_processing_stale(event: dict) -> bool:
+        updated = MemoryStoreBase._safe_parse_dt(event.get("updated_at"))
+        if updated is None:
+            return True
+        stale_minutes = max(1, settings.MEMORY_EVENT_PROCESSING_STALE_MINUTES)
+        age_seconds = (datetime.now() - updated).total_seconds()
+        return age_seconds >= stale_minutes * 60
+
+    async def recover_stuck_processing_events(
+        self,
+        stale_minutes: int | None = None,
+    ) -> int:
+        """Reset events stuck in processing (e.g. after crash) back to failed."""
+        minutes = stale_minutes or settings.MEMORY_EVENT_PROCESSING_STALE_MINUTES
+        minutes = max(1, int(minutes))
+        conn = await self._get_conn()
+        async with self._write_lock:
+            cursor = await conn.execute(
+                """
+                UPDATE memory_events
+                SET status='failed',
+                    last_error=?,
+                    updated_at=datetime('now','localtime')
+                WHERE status='processing'
+                  AND updated_at < datetime('now', ?)
+                """,
+                (
+                    f"processing timeout: recovered after {minutes}m",
+                    f"-{minutes} minutes",
+                ),
+            )
+            await conn.commit()
+            recovered = int(cursor.rowcount or 0)
+        if recovered:
+            logger.warning("recovered %s stuck memory events (stale>%sm)", recovered, minutes)
+        return recovered
+
+    async def _try_claim_event(self, event_id: str, max_retries: int) -> bool:
+        """Atomically claim a pending/failed event for processing."""
+        conn = await self._get_conn()
+        async with self._write_lock:
+            cursor = await conn.execute(
+                """
+                UPDATE memory_events
+                SET status='processing',
+                    updated_at=datetime('now','localtime')
+                WHERE id=?
+                  AND status IN ('pending', 'failed')
+                  AND retry_count < ?
+                """,
+                (event_id, max_retries),
+            )
+            await conn.commit()
+            return int(cursor.rowcount or 0) == 1
+
+    async def _claim_next_pending_event(
+        self,
+        max_retries: int,
+        user_id: int | None = None,
+    ) -> str | None:
+        """Claim the oldest pending/failed event under write lock."""
+        conn = await self._get_conn()
+        async with self._write_lock:
+            if user_id is None:
+                rows = await conn.execute_fetchall(
+                    """
+                    SELECT id FROM memory_events
+                    WHERE status IN ('pending', 'failed')
+                      AND retry_count < ?
+                    ORDER BY created_at ASC
+                    LIMIT 1
+                    """,
+                    (max_retries,),
+                )
+            else:
+                rows = await conn.execute_fetchall(
+                    """
+                    SELECT id FROM memory_events
+                    WHERE user_id=?
+                      AND status IN ('pending', 'failed')
+                      AND retry_count < ?
+                    ORDER BY created_at ASC
+                    LIMIT 1
+                    """,
+                    (user_id, max_retries),
+                )
+            if not rows:
+                return None
+            event_id = str(rows[0]["id"])
+            cursor = await conn.execute(
+                """
+                UPDATE memory_events
+                SET status='processing',
+                    updated_at=datetime('now','localtime')
+                WHERE id=?
+                  AND status IN ('pending', 'failed')
+                  AND retry_count < ?
+                """,
+                (event_id, max_retries),
+            )
+            await conn.commit()
+            return event_id if int(cursor.rowcount or 0) == 1 else None
+
+    async def increment_thread_round(self, thread_id: str, trigger_every: int | None = None) -> bool:
+        """Increment per-thread round counter; return True when auto-trigger threshold is hit."""
+        every = trigger_every or settings.MEMORY_AUTO_TRIGGER_ROUNDS
+        every = max(1, int(every))
+        conn = await self._get_conn()
+        async with self._write_lock:
+            rows = await conn.execute_fetchall(
+                "SELECT round_count FROM memory_thread_counters WHERE thread_id=? LIMIT 1",
+                (thread_id,),
+            )
+            new_count = int(rows[0]["round_count"]) + 1 if rows else 1
+            if rows:
+                await conn.execute(
+                    """
+                    UPDATE memory_thread_counters
+                    SET round_count=?, updated_at=datetime('now','localtime')
+                    WHERE thread_id=?
+                    """,
+                    (new_count, thread_id),
+                )
+            else:
+                await conn.execute(
+                    """
+                    INSERT INTO memory_thread_counters (thread_id, round_count)
+                    VALUES (?, ?)
+                    """,
+                    (thread_id, new_count),
+                )
+            if new_count < every:
+                await conn.commit()
+                return False
+            await conn.execute(
+                """
+                UPDATE memory_thread_counters
+                SET round_count=0, updated_at=datetime('now','localtime')
+                WHERE thread_id=?
+                """,
+                (thread_id,),
+            )
+            await conn.commit()
+        return True
+
+    async def reset_thread_round_counters(self, *thread_ids: str):
+        """Clear round counters when conversation threads are deleted."""
+        if not thread_ids:
+            return
+        conn = await self._get_conn()
+        placeholders = ",".join("?" for _ in thread_ids)
+        async with self._write_lock:
+            await conn.execute(
+                f"DELETE FROM memory_thread_counters WHERE thread_id IN ({placeholders})",
+                list(thread_ids),
+            )
+            await conn.commit()
 
     async def _mark_event_status(
         self,

@@ -34,9 +34,46 @@ async def lifespan(app: FastAPI):
     关闭时：清理资源
     """
     memory_worker_task: asyncio.Task | None = None
+    deferred_startup_task: asyncio.Task | None = None
+
+    async def _deferred_startup():
+        """非阻塞启动任务：不阻塞 /health 与首批 API 请求。"""
+        try:
+            from app.api.v1.interview import recover_stuck_evaluations
+
+            await recover_stuck_evaluations()
+        except Exception as e:
+            logger.warning("startup evaluation recovery failed: %s", e)
+
+        try:
+            from app.agents.memory import MemoryService
+
+            recovered = await MemoryService().recover_stuck_processing_events()
+            if recovered:
+                logger.info("startup memory recovery: reset %s stuck events", recovered)
+        except Exception as e:
+            logger.warning("startup memory event recovery failed: %s", e)
 
     # 启动事件
     try:
+        from app.agents.config import init_checkpointer
+
+        await init_checkpointer()
+        if settings.DEBUG:
+            print("Agent checkpointer 已初始化 (AsyncSqliteSaver)")
+
+        try:
+            from app.core.redis import init_redis
+
+            await init_redis(settings.REDIS_URL)
+        except Exception:
+            if settings.DEBUG:
+                print("[WARNING] Redis 初始化失败 — 限流/缓存将使用内存降级")
+
+        from app.agents.factories import bootstrap_agent_registry
+
+        bootstrap_agent_registry()
+
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
         if settings.DEBUG:
@@ -48,11 +85,6 @@ async def lifespan(app: FastAPI):
             ms = MemoryService()
             await ms._ensure_table()
             await ms.decay_all()
-            # 启动时先消费一轮积压事件，缩短恢复时间。
-            await ms.process_pending_events(
-                batch_size=settings.MEMORY_EVENT_WORKER_BATCH_SIZE,
-                max_retries=settings.MEMORY_EVENT_MAX_RETRIES,
-            )
 
             if settings.MEMORY_EVENT_WORKER_ENABLED:
                 async def _memory_event_worker():
@@ -83,23 +115,28 @@ async def lifespan(app: FastAPI):
                     name="memory-event-worker",
                 )
 
+            deferred_startup_task = asyncio.create_task(
+                _deferred_startup(),
+                name="deferred-startup",
+            )
+
             if settings.DEBUG:
                 print("长期记忆表已创建/确认，过期记忆已清理")
         except Exception as e:
             print(f"[WARNING] 记忆表初始化失败: {e}")
-
-        # 恢复卡住的评估任务（服务重启后）
-        try:
-            from app.api.v1.interview import recover_stuck_evaluations
-            await recover_stuck_evaluations()
-        except Exception as e:
-            print(f"[WARNING] 评估恢复失败（服务仍会启动）: {e}")
     except Exception as e:
         print(f"[WARNING] 数据库表创建失败（服务仍会启动）: {e}")
 
     yield
 
     # 关闭事件
+    if deferred_startup_task is not None:
+        deferred_startup_task.cancel()
+        try:
+            await deferred_startup_task
+        except asyncio.CancelledError:
+            pass
+
     if memory_worker_task is not None:
         memory_worker_task.cancel()
         try:
@@ -108,6 +145,25 @@ async def lifespan(app: FastAPI):
             pass
 
     await engine.dispose()
+    try:
+        from app.agents.config import shutdown_checkpointer
+        await shutdown_checkpointer()
+        if settings.DEBUG:
+            print("Agent checkpointer 已关闭")
+    except Exception:
+        pass
+    try:
+        from app.core.redis import close_redis
+        await close_redis()
+    except Exception:
+        pass
+    try:
+        from app.agents.memory import MemoryService
+        await MemoryService.shutdown()
+        if settings.DEBUG:
+            print("长期记忆数据库连接已关闭")
+    except Exception:
+        pass
     print("数据库连接已释放")
 
 
@@ -185,7 +241,28 @@ def create_application() -> FastAPI:
     @app.get("/health")
     async def health_check():
         """健康检查接口"""
-        return {"status": "ok", "version": "1.0.0"}
+        checkpointer = "uninitialized"
+        try:
+            from app.agents.config import create_checkpointer
+
+            checkpointer = type(create_checkpointer()).__name__
+        except Exception:
+            pass
+        redis_status = "unavailable"
+        try:
+            from app.core.redis import get_redis
+
+            r = get_redis()
+            if r is not None:
+                redis_status = "connected"
+        except Exception:
+            pass
+        return {
+            "status": "ok",
+            "version": "1.0.0",
+            "checkpointer": checkpointer,
+            "redis": redis_status,
+        }
 
     return app
 

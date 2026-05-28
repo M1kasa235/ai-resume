@@ -55,6 +55,7 @@ export const useUserStore = create<UserStore>()(
           state.token = null;
           state.refreshToken = null;
           state.isAuthenticated = false;
+          state.isLoading = false;
         }),
 
       initialize: () => {

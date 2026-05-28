@@ -253,6 +253,60 @@
   font-size: 13px;
 }
 
+.processPanel {
+  align-self: flex-start;
+  max-width: 80%;
+  margin: 4px 0 12px 44px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: #fafafa;
+  border: 1px dashed #e8e8e8;
+}
+
+.processTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: #888;
+  margin-bottom: 8px;
+  letter-spacing: 0.02em;
+}
+
+.processList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.processItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.processIconActive {
+  color: #1677ff;
+  margin-top: 3px;
+}
+
+.processIconDone {
+  color: #52c41a;
+  margin-top: 3px;
+}
+
+.processTextActive {
+  color: #333;
+  font-weight: 500;
+}
+
+.processTextDone {
+  color: #999;
+}
+
 /* ====== 输入区域 ====== */
 .inputArea {
   padding: 16px 24px;
