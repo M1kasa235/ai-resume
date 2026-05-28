@@ -14,7 +14,6 @@ const Questions = lazy(() => import('@features/questions'));
 const Workbench = lazy(() => import('@features/workbench'));
 const AIInterview = lazy(() => import('@features/aiInterview'));
 const AIInterviewReport = lazy(() => import('@features/aiInterview/Report'));
-const AIInterviewHistory = lazy(() => import('@features/aiInterview/History'));
 const AIAdvisor = lazy(() => import('@features/aiAdvisor'));
 const Admin = lazy(() => import('@features/admin'));
 const Profile = lazy(() => import('@features/profile'));
@@ -91,8 +90,7 @@ export const routes: AppRoute[] = [
       },
       {
         path: 'ai-interview/history',
-        element: <AIInterviewHistory />,
-        meta: { title: '面试记录', icon: 'RobotOutlined', breadcrumb: '面试记录' },
+        element: <Navigate to="/ai-interview" replace />,
       },
       {
         path: 'ai-advisor',

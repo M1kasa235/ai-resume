@@ -50,7 +50,7 @@ export default function AIInterviewReport() {
     return (
       <div className={styles.error}>
         <Empty description="报告加载失败" />
-        <Button onClick={() => navigate('/ai-interview/history')}>返回面试记录</Button>
+        <Button onClick={() => navigate('/ai-interview')}>返回 AI 面试</Button>
       </div>
     );
   }
@@ -68,8 +68,8 @@ export default function AIInterviewReport() {
             </span>
           }
           extra={
-            <Button onClick={() => navigate('/ai-interview/history')}>
-              返回面试记录
+            <Button onClick={() => navigate('/ai-interview')}>
+              返回 AI 面试
             </Button>
           }
         />
@@ -82,8 +82,8 @@ export default function AIInterviewReport() {
   return (
     <div className={styles.report}>
       <div className={styles.header}>
-        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/ai-interview/history')}>
-          返回记录
+        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/ai-interview')}>
+          返回 AI 面试
         </Button>
         <Segmented
           options={[
