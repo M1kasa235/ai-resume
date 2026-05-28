@@ -14,8 +14,21 @@
 
 ---
 
-<!-- 预留：产品主截图 -->
-<!-- ![Offer Pilot 首页](./docs/screenshots/dashboard.png) -->
+<p align="center">
+  <img src="./docs/screenshots/dashboard.png" alt="Offer Pilot 仪表盘" width="92%">
+</p>
+
+## 效果展示
+
+| 仪表盘 | AI 求职顾问 | AI 面试报告 |
+|:---:|:---:|:---:|
+| ![仪表盘](./docs/screenshots/dashboard.png) | ![AI 求职顾问](./docs/screenshots/ai-advisor.png) | ![面试报告](./docs/screenshots/interview-report.png) |
+| 投递 / 刷题 / 面试成长曲线与快捷入口 | Supervisor 编排 + 结构化简历分析 | 逐题评估、优劣势与 Markdown 完整报告 |
+
+| 工作台 | 管理后台 · 知识库 |
+|:---:|:---:|
+| ![工作台](./docs/screenshots/workbench.png) | ![知识库管理](./docs/screenshots/admin-rag.png) |
+| 简历预览、投递记录与 RAG 问答 | 岗位 / 面试 / 简历分区文档与分块管理 |
 
 ## 系统架构
 
@@ -68,6 +81,34 @@
 | 每次对话像失忆 | **长期记忆** — 自动识别并持久化偏好/背景/洞察 |
 | 搜岗位靠手动翻 | **智能搜索** — 自然语言搜岗位 + 个性化推荐 |
 
+## 关键设计
+
+面向「搜岗 → 改简历 → 练面试 → 长期陪跑」的完整链路，而不是单点聊天工具。
+
+| 设计点 | 做法 | 带来的体验 |
+|--------|------|------------|
+| **统一对话入口** | `/api/v1/agent/chat/stream` + Supervisor 编排子 Agent | 用户只在一个顾问窗口提问，背后自动路由简历 / 求职 / 记忆能力 |
+| **上下文预算** | `ContextBundle` 分层注入：系统 / 记忆 / 历史 / 用户，字符上限可配置 | 控制 Token 成本，同时保证记忆与近期对话不丢失 |
+| **会话持久化** | LangGraph `AsyncSqliteSaver` 共享 Checkpoint + 可选 Redis 历史缓存 | 多轮对话可续聊；读历史不必每次扫完整 Checkpoint |
+| **长期记忆闭环** | Memory Agent 写入 + SQLite 事件队列 + 后台 Worker 重试 | 偏好 / 事实 / 洞察自动沉淀，下次对话按意图注入 |
+| **简历结构化直通** | 诊断类问题绕过 Supervisor，子 Agent 结构化输出 + 格式化 | 表格化优势分析，避免长文堆砌（见 AI 顾问截图） |
+| **面试全链路** | 流式问答 → 结束触发后台评估 → 结构化 + Markdown 双视图报告 | 面试过程与报告解耦，评估中可轮询、完成后可回看 |
+| **RAG 可运营** | 管理后台按分区（岗位 / 面试 / 简历）导入文档与分块 | 知识库与业务数据分离，便于扩充面试题与行业资料 |
+| **韧性优先** | Redis / LLM 不可用时降级；`ModelRetryMiddleware`；工具调用上限 | 单实例开发不绑 Redis；生产可逐步增强限流与缓存 |
+
+## 技术选型优势
+
+| 层级 | 选型 | 优势说明 |
+|------|------|----------|
+| **API** | FastAPI + Uvicorn | 原生异步，SSE 流式推送 Agent 状态与 Token；OpenAPI 自动生成 |
+| **ORM** | SQLAlchemy 2.0 + aiomysql | 与 FastAPI 异步模型一致，岗位 / 投递 / 面试等业务表统一事务 |
+| **Agent** | LangChain `create_agent` + LangGraph Checkpoint | 工具调用、重试、摘要中间件可组合；会话状态可落库续聊 |
+| **编排** | Supervisor + 子 Agent 工厂注册 | 新增专家只需注册工厂与工具，HTTP 层经 `facade` 保持稳定 |
+| **向量检索** | ChromaDB + BM25 混合 + Rerank | 简历/JD 既匹配关键词又覆盖语义；支持 DashScope Embedding / Rerank |
+| **缓存** | Redis（可选） | 限流、会话历史、记忆上下文热数据；连接失败自动回退内存实现 |
+| **前端** | React 18 + Vite + Ant Design + TanStack Query | 模块按 `features` 划分；Query 缓存岗位/报告；`BackendStartupGuard` 等待后端就绪 |
+| **部署** | Docker 多阶段构建 + Compose | 一条命令拉起 MySQL / Redis / 后端；前端 dev profile 热更新 |
+
 ## 核心亮点
 
 ###  多智能体协作架构
@@ -95,8 +136,9 @@
 
 所有 Agent **共享**同一 `AsyncSqliteSaver` Checkpointer；Supervisor 智能路由并支持跨领域并行调用（`both_agents_tool`）。编排过程通过 SSE 推送 `progress` 事件，前端 `StreamProcess` 组件展示子任务进度。
 
-<!-- 预留：AI 顾问对话截图 -->
-<!-- ![AI 顾问对话](./docs/screenshots/ai-advisor.png) -->
+<p align="center">
+  <img src="./docs/screenshots/ai-advisor.png" alt="AI 求职顾问" width="88%">
+</p>
 
 ###  长期记忆系统
 
@@ -122,9 +164,6 @@
 - **上下文注入**: 按意图分类 + 类别配额自动注入，单次注入 ≤ 500 字符
 - **append 模式**: 同 key 写入时不覆盖，自动追加时间戳后缀（解决"多段工作经历"问题）
 
-<!-- 预留：记忆管理截图 -->
-<!-- ![记忆管理](./docs/screenshots/memory-management.png) -->
-
 ###  RAG 混合检索管道
 
 ```
@@ -137,8 +176,9 @@
 - BM25 + 向量检索的混合策略，兼顾精确匹配与语义泛化
 - 支持 PDF 简历自动解析与分块存储
 
-<!-- 预留：RAG 管理后台截图 -->
-<!-- ![RAG 管理后台](./docs/screenshots/admin-rag.png) -->
+<p align="center">
+  <img src="./docs/screenshots/admin-rag.png" alt="知识库管理后台" width="88%">
+</p>
 
 ###  AI 模拟面试
 
@@ -155,11 +195,18 @@
 - 每道题**实时点评**，指出亮点和不足
 - 结束后生成完整**评估报告**: 逐题评分 + 综合评估 + 改进建议
 
-<!-- 预留：AI 面试截图 -->
-<!-- ![AI 面试](./docs/screenshots/ai-interview.png) -->
+<p align="center">
+  <img src="./docs/screenshots/interview-report.png" alt="AI 面试评估报告" width="88%">
+</p>
 
-<!-- 预留：面试报告截图 -->
-<!-- ![面试报告](./docs/screenshots/interview-report.png) -->
+###  工作台一站式
+
+- 简历上传与在线预览、投递记录跟踪
+- 集成简历诊断 / 岗位匹配 / RAG 问答，减少页面跳转
+
+<p align="center">
+  <img src="./docs/screenshots/workbench.png" alt="工作台" width="88%">
+</p>
 
 ## 功能总览
 
@@ -509,19 +556,17 @@ curl -X POST http://localhost:8080/api/v1/memory/extract \
 alembic upgrade head
 ```
 
-## 截图预留
+## 截图资源
 
-> 请在 `docs/screenshots/` 目录下放置以下截图：
+产品截图位于 [`docs/screenshots/`](./docs/screenshots/)：
 
-| 文件名 | 说明 |
-|--------|------|
+| 文件 | 说明 |
+|------|------|
 | `dashboard.png` | 仪表盘首页 |
-| `ai-advisor.png` | AI 求职顾问对话页 |
-| `ai-interview.png` | AI 模拟面试进行中 |
-| `interview-report.png` | 面试评估报告 |
-| `memory-management.png` | 记忆管理页面 |
-| `admin-rag.png` | RAG 知识库管理后台 |
-| `job-search.png` | 岗位搜索与列表 |
+| `ai-advisor.png` | AI 求职顾问对话 |
+| `interview-report.png` | AI 面试评估报告 |
+| `workbench.png` | 工作台 |
+| `admin-rag.png` | 知识库管理后台 |
 
 ## 许可证
 
